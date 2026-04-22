@@ -107,6 +107,8 @@ runTest("renderExplorer marks the active file and escapes file-path attributes",
 
   assert.equal(elements.explorerPanel.hidden, false);
   assert.equal(elements.appRoot.classList.has("app-root-with-explorer"), true);
+  assert.match(elements.explorerTree.innerHTML, /<details class="tree-directory">/);
+  assert.doesNotMatch(elements.explorerTree.innerHTML, /<details class="tree-directory" open>/);
   assert.match(elements.explorerTree.innerHTML, /tree-file-button-active/);
   assert.match(elements.explorerTree.innerHTML, /aria-current="page"/);
   assert.match(elements.explorerTree.innerHTML, /data-file-path="C:\/docs\/&lt;draft&gt;&amp;&quot;quote&quot;\.md"/);

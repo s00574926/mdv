@@ -84,7 +84,7 @@ export function renderExplorerNode(node: ExplorerNode, currentFilePath: string |
   if (node.kind === "directory") {
     const children = node.children.map((child) => renderExplorerNode(child, currentFilePath)).join("");
     return `
-      <details class="tree-directory" open>
+      <details class="tree-directory">
         <summary>${node.name}</summary>
         <div class="tree-children">${children}</div>
       </details>
