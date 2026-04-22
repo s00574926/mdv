@@ -15,7 +15,8 @@ const RECENT_FILES_NAME: &str = "recent-files.json";
 pub struct AppSession {
     pub current_path: Option<PathBuf>,
     pub current_directory: Option<PathBuf>,
-    pub watcher: Option<RecommendedWatcher>,
+    pub current_document_watcher: Option<RecommendedWatcher>,
+    pub explorer_watcher: Option<RecommendedWatcher>,
     pub recent_paths: Vec<PathBuf>,
 }
 

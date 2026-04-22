@@ -47,7 +47,9 @@ pub fn open_folder_path(
         );
     }
 
-    workspace_session::set_open_directory(state, canonical_directory)?;
+    let explorer_watcher =
+        watcher::watch_workspace_directory(app.clone(), canonical_directory.clone())?;
+    workspace_session::set_open_directory(state, canonical_directory, explorer_watcher)?;
     current_workspace(state)
 }
 
@@ -149,13 +151,18 @@ fn open_markdown_with_directory(
     };
 
     let document = markdown::render_file(&canonical_path, true)?;
-    let watcher = watcher::watch_file(app.clone(), canonical_path.clone())?;
+    let current_document_watcher = watcher::watch_file(app.clone(), canonical_path.clone())?;
+    let explorer_watcher = resolved_directory
+        .as_ref()
+        .map(|directory| watcher::watch_workspace_directory(app.clone(), directory.clone()))
+        .transpose()?;
 
     workspace_session::set_open_document(
         state,
         canonical_path.clone(),
         resolved_directory,
-        watcher,
+        current_document_watcher,
+        explorer_watcher,
     )?;
 
     if remember_recent {
