@@ -9,18 +9,6 @@ use crate::{
 
 pub const WORKSPACE_UPDATED_EVENT: &str = "workspace://updated";
 
-pub fn load_initial_workspace(
-    app: &AppHandle,
-    state: &State<'_, AppState>,
-) -> Result<WorkspacePayload> {
-    if workspace_session::has_existing_workspace(state)? {
-        return current_workspace(state);
-    }
-
-    let sample_path = markdown::resolve_default_path()?;
-    open_markdown_with_directory(app, state, &sample_path, None, false)
-}
-
 pub fn new_document(app: &AppHandle, state: &State<'_, AppState>) -> Result<WorkspacePayload> {
     workspace_session::clear(state)?;
     app_menu::refresh_menu(app)?;

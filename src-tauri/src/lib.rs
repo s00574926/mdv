@@ -21,7 +21,6 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::load_initial_workspace,
             commands::new_document,
             commands::open_markdown,
             commands::open_folder,

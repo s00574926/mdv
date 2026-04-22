@@ -13,15 +13,6 @@ pub struct WorkspaceSnapshot {
     pub recent_paths: Vec<PathBuf>,
 }
 
-pub fn has_existing_workspace(state: &State<'_, AppState>) -> Result<bool> {
-    let session = state
-        .session
-        .lock()
-        .map_err(|_| anyhow::anyhow!("The preview state is unavailable."))?;
-
-    Ok(session.current_path.is_some() || session.current_directory.is_some())
-}
-
 pub fn clear(state: &State<'_, AppState>) -> Result<()> {
     let mut session = state
         .session

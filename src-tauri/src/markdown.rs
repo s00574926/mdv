@@ -1,10 +1,7 @@
 use anyhow::{Context, Result};
 use comrak::{Options, markdown_to_html};
 use serde::Serialize;
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::Path};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -47,16 +44,6 @@ pub fn render_error(path: &Path, error: &anyhow::Error, watching: bool) -> Rende
         source_path: path.display().to_string(),
         watching,
     }
-}
-
-pub fn resolve_default_path() -> Result<PathBuf> {
-    let path = std::env::current_dir()
-        .context("Failed to resolve the current working directory")?
-        .join("sample")
-        .join("example.md");
-
-    path.canonicalize()
-        .with_context(|| format!("Failed to resolve sample file at {}", path.display()))
 }
 
 pub fn new_document() -> RenderedDocument {

@@ -5,14 +5,6 @@ use tauri::{AppHandle, State};
 use crate::{state::AppState, workspace_payload::WorkspacePayload};
 
 #[tauri::command]
-pub fn load_initial_workspace(
-    app: AppHandle,
-    state: State<'_, AppState>,
-) -> Result<WorkspacePayload, String> {
-    crate::workspace::load_initial_workspace(&app, &state).map_err(format_error)
-}
-
-#[tauri::command]
 pub fn new_document(
     app: AppHandle,
     state: State<'_, AppState>,
