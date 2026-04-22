@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use tauri::{AppHandle, State};
 
-use crate::{state::AppState, workspace::WorkspacePayload};
+use crate::{state::AppState, workspace_payload::WorkspacePayload};
 
 #[tauri::command]
 pub fn load_initial_workspace(

@@ -1,9 +1,12 @@
 mod app_menu;
 mod commands;
+mod explorer;
 mod markdown;
 mod state;
 mod watcher;
 mod workspace;
+mod workspace_payload;
+mod workspace_session;
 
 use tauri::Manager;
 
