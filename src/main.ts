@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 const WORKSPACE_UPDATED_EVENT = "workspace://updated";
+const TRUSTED_PREVIEW_TRUST_MODEL = "trusted-local-markdown-preview";
 
 type MermaidInstance = (typeof import("mermaid"))["default"];
 
@@ -13,6 +14,7 @@ interface RenderedDocument {
   sourceName: string;
   sourcePath: string;
   watching: boolean;
+  trustModel: typeof TRUSTED_PREVIEW_TRUST_MODEL;
 }
 
 interface ExplorerNode {
@@ -58,7 +60,7 @@ async function getMermaid(): Promise<MermaidInstance> {
     mermaidInstancePromise = import("mermaid").then(({ default: mermaid }) => {
       mermaid.initialize({
         startOnLoad: false,
-        securityLevel: "loose",
+        securityLevel: "antiscript",
         theme: "dark"
       });
 
@@ -90,13 +92,23 @@ function clearPreview(): void {
   elements.preview.innerHTML = "";
 }
 
-async function renderDocument(documentPayload: RenderedDocument): Promise<void> {
+function setTrustedPreviewHtml(documentPayload: RenderedDocument): void {
+  if (documentPayload.trustModel !== TRUSTED_PREVIEW_TRUST_MODEL) {
+    throw new Error(`Unexpected preview trust model: ${documentPayload.trustModel}`);
+  }
+
+  // mdv only injects HTML that crossed the explicit trusted preview boundary
+  // on the Rust side. Untrusted Markdown must not be routed through this path.
+  elements.preview.innerHTML = documentPayload.html;
+}
+
+async function renderTrustedPreviewDocument(documentPayload: RenderedDocument): Promise<void> {
   if (!documentPayload.html) {
     clearPreview();
     return;
   }
 
-  elements.preview.innerHTML = documentPayload.html;
+  setTrustedPreviewHtml(documentPayload);
   await renderMermaid();
 }
 
@@ -150,7 +162,7 @@ function renderExplorer(explorer: ExplorerRoot | null, currentFilePath: string |
 
 async function renderWorkspace(workspace: WorkspacePayload): Promise<void> {
   renderExplorer(workspace.explorer, workspace.currentFilePath);
-  await renderDocument(workspace.document);
+  await renderTrustedPreviewDocument(workspace.document);
 }
 
 elements.explorerTree.addEventListener("click", async (event: MouseEvent) => {

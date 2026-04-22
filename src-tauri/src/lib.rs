@@ -3,6 +3,7 @@ mod commands;
 mod explorer;
 mod markdown;
 mod state;
+mod trusted_preview;
 mod watcher;
 mod workspace;
 mod workspace_payload;

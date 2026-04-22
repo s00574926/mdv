@@ -40,5 +40,7 @@ Notes:
 ## Notes
 
 - Mermaid blocks are rewritten to raw HTML containers on the Rust side, then rendered in the webview.
-- Raw HTML is enabled in `comrak` so Mermaid containers survive the Markdown render step.
-- This is a local preview tool scaffold, not a sanitized renderer for untrusted Markdown.
+- Raw HTML is intentionally enabled in `comrak` for the explicit `trusted-local-markdown-preview` boundary so Mermaid containers survive the Markdown render step.
+- The frontend only injects HTML tagged with that trusted preview model, and Mermaid runs in a stricter `antiscript` mode instead of `loose`.
+- Production CSP is explicitly set in [tauri.conf.json](/C:/work/mdv/src-tauri/tauri.conf.json:1) instead of leaving it `null`, but development still uses `devCsp: null` to avoid breaking the Vite dev server.
+- This is still a local preview tool for trusted Markdown you open yourself, not a sanitized renderer for untrusted content.

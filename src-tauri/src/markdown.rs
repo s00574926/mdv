@@ -1,7 +1,9 @@
 use anyhow::{Context, Result};
-use comrak::{Options, markdown_to_html};
+use comrak::markdown_to_html;
 use serde::Serialize;
 use std::{fs, path::Path};
+
+use crate::trusted_preview;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,6 +13,7 @@ pub struct RenderedDocument {
     pub source_name: String,
     pub source_path: String,
     pub watching: bool,
+    pub trust_model: &'static str,
 }
 
 pub fn render_file(path: &Path, watching: bool) -> Result<RenderedDocument> {
@@ -43,6 +46,7 @@ pub fn render_error(path: &Path, error: &anyhow::Error, watching: bool) -> Rende
         source_name: file_name(path),
         source_path: path.display().to_string(),
         watching,
+        trust_model: trusted_preview::TRUST_MODEL,
     }
 }
 
@@ -53,22 +57,13 @@ pub fn new_document() -> RenderedDocument {
         source_name: String::new(),
         source_path: String::new(),
         watching: false,
+        trust_model: trusted_preview::TRUST_MODEL,
     }
 }
 
 pub fn folder_placeholder_document(path: &Path) -> RenderedDocument {
     let _ = path;
     new_document()
-}
-
-fn markdown_options() -> Options<'static> {
-    let mut options = Options::default();
-    options.extension.autolink = true;
-    options.extension.strikethrough = true;
-    options.extension.table = true;
-    options.extension.tasklist = true;
-    options.render.r#unsafe = true;
-    options
 }
 
 fn render_markdown(
@@ -79,7 +74,7 @@ fn render_markdown(
     watching: bool,
 ) -> RenderedDocument {
     let transformed = rewrite_mermaid_blocks(markdown);
-    let html = markdown_to_html(&transformed, &markdown_options());
+    let html = markdown_to_html(&transformed, &trusted_preview::markdown_options());
 
     RenderedDocument {
         title: title.to_owned(),
@@ -87,6 +82,7 @@ fn render_markdown(
         source_name: source_name.to_owned(),
         source_path: source_path.to_owned(),
         watching,
+        trust_model: trusted_preview::TRUST_MODEL,
     }
 }
 
@@ -194,8 +190,10 @@ fn file_name(path: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{render_file, rewrite_mermaid_blocks};
+    use super::{new_document, render_file, rewrite_mermaid_blocks};
     use std::{fs, path::PathBuf};
+
+    use crate::trusted_preview::TRUST_MODEL;
 
     struct FixtureExpectation {
         file_name: &'static str,
@@ -295,6 +293,16 @@ fn main() {
         expected.sort();
 
         assert_eq!(actual, expected, "fixture list and test catalog drifted");
+    }
+
+    #[test]
+    fn trusted_preview_documents_are_explicitly_marked() {
+        let empty = new_document();
+        assert_eq!(empty.trust_model, TRUST_MODEL);
+
+        let rendered = render_file(&fixture_path("flow-and-sequence.md"), false)
+            .expect("failed to render trusted preview fixture");
+        assert_eq!(rendered.trust_model, TRUST_MODEL);
     }
 
     fn fixtures_dir() -> PathBuf {
