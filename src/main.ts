@@ -2,40 +2,15 @@ import "./styles.css";
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import {
+  clearPreview,
+  renderWorkspaceFrame,
+  type WorkspacePayload
+} from "./view";
 
 const WORKSPACE_UPDATED_EVENT = "workspace://updated";
-const TRUSTED_PREVIEW_TRUST_MODEL = "trusted-local-markdown-preview";
 
 type MermaidInstance = (typeof import("mermaid"))["default"];
-
-interface RenderedDocument {
-  title: string;
-  html: string;
-  sourceName: string;
-  sourcePath: string;
-  watching: boolean;
-  trustModel: typeof TRUSTED_PREVIEW_TRUST_MODEL;
-}
-
-interface ExplorerNode {
-  name: string;
-  path: string;
-  kind: "directory" | "file";
-  children: ExplorerNode[];
-}
-
-interface ExplorerRoot {
-  name: string;
-  path: string;
-  children: ExplorerNode[];
-}
-
-interface WorkspacePayload {
-  document: RenderedDocument;
-  currentFilePath: string | null;
-  explorer: ExplorerRoot | null;
-  recentPaths: string[];
-}
 
 let mermaidInstancePromise: Promise<MermaidInstance> | undefined;
 
@@ -88,81 +63,14 @@ async function renderMermaid(): Promise<void> {
   await mermaid.run({ nodes });
 }
 
-function clearPreview(): void {
-  elements.preview.innerHTML = "";
-}
-
-function setTrustedPreviewHtml(documentPayload: RenderedDocument): void {
-  if (documentPayload.trustModel !== TRUSTED_PREVIEW_TRUST_MODEL) {
-    throw new Error(`Unexpected preview trust model: ${documentPayload.trustModel}`);
-  }
-
-  // mdv only injects HTML that crossed the explicit trusted preview boundary
-  // on the Rust side. Untrusted Markdown must not be routed through this path.
-  elements.preview.innerHTML = documentPayload.html;
-}
-
-async function renderTrustedPreviewDocument(documentPayload: RenderedDocument): Promise<void> {
-  if (!documentPayload.html) {
-    clearPreview();
-    return;
-  }
-
-  setTrustedPreviewHtml(documentPayload);
-  await renderMermaid();
-}
-
-function escapeAttribute(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("\"", "&quot;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-}
-
-function renderExplorerNode(node: ExplorerNode, currentFilePath: string | null): string {
-  if (node.kind === "directory") {
-    const children = node.children.map((child) => renderExplorerNode(child, currentFilePath)).join("");
-    return `
-      <details class="tree-directory" open>
-        <summary>${node.name}</summary>
-        <div class="tree-children">${children}</div>
-      </details>
-    `;
-  }
-
-  const isActive = currentFilePath === node.path;
-  return `
-    <button
-      type="button"
-      class="tree-file-button${isActive ? " tree-file-button-active" : ""}"
-      data-file-path="${escapeAttribute(node.path)}"
-      role="treeitem"
-      aria-current="${isActive ? "page" : "false"}"
-    >
-      ${node.name}
-    </button>
-  `;
-}
-
-function renderExplorer(explorer: ExplorerRoot | null, currentFilePath: string | null): void {
-  if (!explorer) {
-    elements.explorerPanel.hidden = true;
-    elements.explorerTree.innerHTML = "";
-    elements.appRoot.classList.remove("app-root-with-explorer");
-    return;
-  }
-
-  elements.explorerPanel.hidden = false;
-  elements.appRoot.classList.add("app-root-with-explorer");
-  elements.explorerTree.innerHTML = explorer.children
-    .map((node) => renderExplorerNode(node, currentFilePath))
-    .join("");
-}
-
 async function renderWorkspace(workspace: WorkspacePayload): Promise<void> {
-  renderExplorer(workspace.explorer, workspace.currentFilePath);
-  await renderTrustedPreviewDocument(workspace.document);
+  renderWorkspaceFrame(elements, workspace);
+
+  if (!workspace.document.html) {
+    return;
+  }
+
+  await renderMermaid();
 }
 
 elements.explorerTree.addEventListener("click", async (event: MouseEvent) => {
@@ -201,4 +109,4 @@ await listen<WorkspacePayload>(WORKSPACE_UPDATED_EVENT, async (event) => {
   }
 });
 
-clearPreview();
+clearPreview(elements.preview);

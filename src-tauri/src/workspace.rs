@@ -195,3 +195,21 @@ fn ensure_markdown_file(path: &Path) -> Result<()> {
 
     bail!("Only .md files can be opened.");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ensure_markdown_file;
+    use std::path::Path;
+
+    #[test]
+    fn accepts_markdown_paths_case_insensitively() {
+        assert!(ensure_markdown_file(Path::new("notes.md")).is_ok());
+        assert!(ensure_markdown_file(Path::new("notes.MD")).is_ok());
+    }
+
+    #[test]
+    fn rejects_non_markdown_paths() {
+        let error = ensure_markdown_file(Path::new("notes.txt")).expect_err("expected rejection");
+        assert_eq!(error.to_string(), "Only .md files can be opened.");
+    }
+}

@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 1420",
     "build": "vite build",
+    "test": "npm.cmd run test:frontend && cargo test -q --manifest-path src-tauri/Cargo.toml",
+    "test:frontend": "node test/frontend/view.test.mjs",
     "typecheck": "tsc --noEmit",
     "tauri": "tauri"
   },

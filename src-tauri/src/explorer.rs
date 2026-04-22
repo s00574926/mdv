@@ -91,3 +91,84 @@ fn first_markdown_from_node(node: &ExplorerNode) -> Option<PathBuf> {
         ExplorerNodeKind::Directory => node.children.iter().find_map(first_markdown_from_node),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{build_root, find_first_markdown_file};
+    use crate::workspace_payload::ExplorerNodeKind;
+    use std::{
+        env, fs,
+        path::{Path, PathBuf},
+        sync::atomic::{AtomicU64, Ordering},
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    static NEXT_TEST_ID: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    fn build_root_includes_only_markdown_files() {
+        let root = unique_test_dir("explorer-tree");
+        fs::create_dir_all(&root).expect("failed to create root dir");
+        fs::create_dir_all(root.join("docs")).expect("failed to create docs dir");
+        fs::write(root.join("docs").join("guide.md"), "# Guide").expect("failed to write markdown");
+        fs::write(root.join("docs").join("notes.txt"), "ignore").expect("failed to write text");
+        fs::write(root.join("readme.md"), "# Readme").expect("failed to write root markdown");
+
+        let explorer = build_root(&root).expect("failed to build root");
+        assert_eq!(explorer.children.len(), 2);
+        let docs = explorer
+            .children
+            .iter()
+            .find(|node| node.name == "docs")
+            .expect("missing docs dir");
+        assert!(matches!(docs.kind, ExplorerNodeKind::Directory));
+        assert!(explorer.children.iter().any(|node| node.name == "readme.md"));
+
+        cleanup_test_dir(&root);
+    }
+
+    #[test]
+    fn find_first_markdown_file_prefers_sorted_directory_order() {
+        let root = unique_test_dir("explorer-first");
+        fs::create_dir_all(&root).expect("failed to create root dir");
+        fs::create_dir_all(root.join("a-dir")).expect("failed to create first dir");
+        fs::create_dir_all(root.join("z-dir")).expect("failed to create second dir");
+        fs::write(root.join("z-dir").join("later.md"), "# later").expect("failed to write later");
+        fs::write(root.join("a-dir").join("first.md"), "# first").expect("failed to write first");
+
+        let first = find_first_markdown_file(&root).expect("failed to scan dir");
+        assert_eq!(
+            first.expect("expected markdown file"),
+            root.join("a-dir").join("first.md")
+        );
+
+        cleanup_test_dir(&root);
+    }
+
+    #[test]
+    fn find_first_markdown_file_returns_none_when_absent() {
+        let root = unique_test_dir("explorer-empty");
+        fs::create_dir_all(&root).expect("failed to create root");
+        fs::write(root.join("notes.txt"), "ignore").expect("failed to write non-markdown");
+
+        let first = find_first_markdown_file(&root).expect("failed to scan dir");
+        assert!(first.is_none());
+
+        cleanup_test_dir(&root);
+    }
+
+    fn unique_test_dir(name: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time went backwards")
+            .as_nanos();
+        let sequence = NEXT_TEST_ID.fetch_add(1, Ordering::Relaxed);
+        env::temp_dir()
+            .join("mdv-tests")
+            .join(format!("{nonce}-{sequence}-{name}"))
+    }
+
+    fn cleanup_test_dir(path: &Path) {
+        let _ = fs::remove_dir_all(path);
+    }
+}
