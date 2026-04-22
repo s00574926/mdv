@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 
 import {
+  DEFAULT_PREVIEW_SCALE,
+  MAX_PREVIEW_SCALE,
+  MIN_PREVIEW_SCALE,
+  applyPreviewScale,
+  clampPreviewScale,
+  getNextPreviewScale,
+  isPreviewZoomShortcut,
   TRUSTED_PREVIEW_TRUST_MODEL,
   clearPreview,
   renderExplorer,
@@ -24,6 +31,18 @@ class FakeClassList {
   }
 }
 
+class FakeStyle {
+  #properties = new Map();
+
+  setProperty(name, value) {
+    this.#properties.set(name, value);
+  }
+
+  getPropertyValue(name) {
+    return this.#properties.get(name) ?? "";
+  }
+}
+
 function createElements() {
   return {
     appRoot: {
@@ -36,7 +55,8 @@ function createElements() {
       innerHTML: ""
     },
     preview: {
-      innerHTML: ""
+      innerHTML: "",
+      style: new FakeStyle()
     }
   };
 }
@@ -168,4 +188,32 @@ runTest("clearPreview empties the preview region", () => {
   const preview = { innerHTML: "<p>stale</p>" };
   clearPreview(preview);
   assert.equal(preview.innerHTML, "");
+});
+
+runTest("preview zoom uses ctrl or cmd modified wheel gestures", () => {
+  assert.equal(isPreviewZoomShortcut({ ctrlKey: true, metaKey: false }), true);
+  assert.equal(isPreviewZoomShortcut({ ctrlKey: false, metaKey: true }), true);
+  assert.equal(isPreviewZoomShortcut({ ctrlKey: false, metaKey: false }), false);
+});
+
+runTest("preview zoom steps and clamps the scale range", () => {
+  assert.equal(DEFAULT_PREVIEW_SCALE, 1);
+  assert.equal(getNextPreviewScale(1, -120), 1.1);
+  assert.equal(getNextPreviewScale(1, 120), 0.9);
+  assert.equal(getNextPreviewScale(MIN_PREVIEW_SCALE, 120), MIN_PREVIEW_SCALE);
+  assert.equal(getNextPreviewScale(MAX_PREVIEW_SCALE, -120), MAX_PREVIEW_SCALE);
+  assert.equal(clampPreviewScale(99), MAX_PREVIEW_SCALE);
+  assert.equal(clampPreviewScale(0.01), MIN_PREVIEW_SCALE);
+});
+
+runTest("applyPreviewScale writes the preview scale css variable", () => {
+  const preview = {
+    innerHTML: "",
+    style: new FakeStyle()
+  };
+
+  const nextScale = applyPreviewScale(preview, 1.3);
+
+  assert.equal(nextScale, 1.3);
+  assert.equal(preview.style.getPropertyValue("--preview-scale"), "1.30");
 });

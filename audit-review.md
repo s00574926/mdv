@@ -3,6 +3,18 @@
 Date: 2026-04-22
 Mode: FULL AUDIT
 
+## Status note
+
+This file is a point-in-time audit snapshot, not the primary source of truth for current commands or file paths. For the current setup, shipped behavior, and packaging commands, use [README.md](/C:/work/mdv/README.md:1).
+
+## Current status addendum
+
+- The frontend is now TypeScript-based under [src/main.ts](/C:/work/mdv/src/main.ts:1) and [src/view.ts](/C:/work/mdv/src/view.ts:1), not the earlier `main.js` layout referenced later in this audit.
+- [package.json](/C:/work/mdv/package.json:1) now includes `npm.cmd run test:frontend` and `npm.cmd run typecheck` in addition to the combined `npm.cmd test` workflow.
+- The trusted preview path has been tightened since this audit: the frontend only injects HTML marked with the explicit `trusted-local-markdown-preview` trust model, Mermaid runs with `securityLevel: "antiscript"`, and production CSP is set in [tauri.conf.json](/C:/work/mdv/src-tauri/tauri.conf.json:1).
+- The preview now supports viewport zoom with `Ctrl`/`Cmd` plus mouse wheel in [src/main.ts](/C:/work/mdv/src/main.ts:81).
+- Open concerns from this audit that still appear current: the GitHub Actions workflow in [.github/workflows/rust.yml](/C:/work/mdv/.github/workflows/rust.yml:1) still runs Cargo from the repo root, the Mermaid bundle is still large, and the offline installer still carries the expected WebView2 size penalty.
+
 ## Step 0
 
 Stacks detected: Web/JS/CSS plus Rust/Tauri.
@@ -13,7 +25,7 @@ Stacks detected: Web/JS/CSS plus Rust/Tauri.
 - `npm run build` passes once run outside the sandbox; Vite builds in 4.46s.
 - `npm audit --json` reports 0 vulnerabilities.
 - There are no `TODO`/`FIXME`/`HACK` markers in tracked source.
-- There is no frontend lint, typecheck, or test script in [package.json](/C:/work/mdv/package.json:1).
+- There is no frontend lint script in [package.json](/C:/work/mdv/package.json:1), but frontend typecheck and test scripts now exist.
 - CI is currently broken: [rust.yml](/C:/work/mdv/.github/workflows/rust.yml:19) runs `cargo build` and `cargo test` from repo root, but the manifest is in `src-tauri/`. Reproducing `cargo build` at `C:\work\mdv` fails immediately.
 - Production build already warns about oversized Mermaid chunks; `mermaid.core` is 601.5 kB minified, 145.8 kB gzip.
 - Current built payload is about 2.99 MB under `dist`; the Windows offline installer is about 201.6 MB, mostly because [tauri.conf.json](/C:/work/mdv/src-tauri/tauri.conf.json:28) uses `offlineInstaller`.
@@ -25,20 +37,20 @@ Stacks detected: Web/JS/CSS plus Rust/Tauri.
 
 ### Platform / language floor
 
-- Frontend is plain ESM JavaScript on Vite; no TS, no browserslist, no lint config.
+- Frontend is TypeScript on Vite; there is still no browserslist or lint config.
 - Rust is edition 2024 in [Cargo.toml](/C:/work/mdv/src-tauri/Cargo.toml:1), but there is no explicit `rust-version` floor declared.
 
 ### Tech debt concentration
 
 - [workspace.rs](/C:/work/mdv/src-tauri/src/workspace.rs:1): biggest module and central state/orchestration path.
 - [markdown.rs](/C:/work/mdv/src-tauri/src/markdown.rs:1): rendering, HTML trust boundary, and most existing tests.
-- [main.js](/C:/work/mdv/src/main.js:1) plus [watcher.rs](/C:/work/mdv/src-tauri/src/watcher.rs:1): UI/event model and refresh behavior.
+- [main.ts](/C:/work/mdv/src/main.ts:1) plus [watcher.rs](/C:/work/mdv/src-tauri/src/watcher.rs:1): UI/event model and refresh behavior.
 - Git history is too short to use churn meaningfully: only 4 commits.
 
 ### Early high-risk observations
 
 - Do fix CI first. [rust.yml](/C:/work/mdv/.github/workflows/rust.yml:19) is a hard reliability failure.
-- Do review the trust boundary next. [markdown.rs](/C:/work/mdv/src-tauri/src/markdown.rs:77) enables unsafe HTML, [main.js](/C:/work/mdv/src/main.js:59) injects it with `innerHTML`, Mermaid runs in `"loose"` mode at [main.js](/C:/work/mdv/src/main.js:19), and [tauri.conf.json](/C:/work/mdv/src-tauri/tauri.conf.json:24) sets `csp: null`.
+- Do keep reviewing the trust boundary as a trusted-local contract. [markdown.rs](/C:/work/mdv/src-tauri/src/markdown.rs:67) still enables unsafe HTML for trusted content, but the frontend now gates injection by trust model in [view.ts](/C:/work/mdv/src/view.ts:95), Mermaid runs in `antiscript` mode in [main.ts](/C:/work/mdv/src/main.ts:41), and production CSP is explicitly set in [tauri.conf.json](/C:/work/mdv/src-tauri/tauri.conf.json:1).
 - Do simplify the workspace model before adding features. [workspace.rs](/C:/work/mdv/src-tauri/src/workspace.rs:46) contains an unused startup path, and [watcher.rs](/C:/work/mdv/src-tauri/src/watcher.rs:8) only watches the selected file’s parent, so explorer contents can go stale.
 
 ### Impact / effort matrix
@@ -79,7 +91,7 @@ menu / commands
    ├─ watcher.rs    fs events -> emit refresh
    └─ app_menu.rs   menu refresh + open/recent actions
 
-frontend main.js
+frontend main.ts
    └─ listens for `workspace://updated`
       and directly injects returned HTML
 ```

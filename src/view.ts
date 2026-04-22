@@ -1,4 +1,9 @@
 export const TRUSTED_PREVIEW_TRUST_MODEL = "trusted-local-markdown-preview";
+export const DEFAULT_PREVIEW_SCALE = 1;
+export const MIN_PREVIEW_SCALE = 0.5;
+export const MAX_PREVIEW_SCALE = 2.5;
+
+const PREVIEW_SCALE_STEP = 0.1;
 
 export interface RenderedDocument {
   title: string;
@@ -34,8 +39,13 @@ interface ClassListLike {
   remove(token: string): void;
 }
 
+interface StyleLike {
+  setProperty(name: string, value: string): void;
+}
+
 interface PreviewLike {
   innerHTML: string;
+  style?: StyleLike;
 }
 
 interface ExplorerPanelLike {
@@ -57,6 +67,29 @@ export interface ViewElements {
 
 export function clearPreview(preview: PreviewLike): void {
   preview.innerHTML = "";
+}
+
+export function isPreviewZoomShortcut(event: Pick<WheelEvent, "ctrlKey" | "metaKey">): boolean {
+  return event.ctrlKey || event.metaKey;
+}
+
+export function clampPreviewScale(scale: number): number {
+  return Number(Math.min(MAX_PREVIEW_SCALE, Math.max(MIN_PREVIEW_SCALE, scale)).toFixed(2));
+}
+
+export function getNextPreviewScale(currentScale: number, deltaY: number): number {
+  if (deltaY === 0) {
+    return clampPreviewScale(currentScale);
+  }
+
+  const delta = deltaY < 0 ? PREVIEW_SCALE_STEP : -PREVIEW_SCALE_STEP;
+  return clampPreviewScale(currentScale + delta);
+}
+
+export function applyPreviewScale(preview: PreviewLike, scale: number): number {
+  const nextScale = clampPreviewScale(scale);
+  preview.style?.setProperty("--preview-scale", nextScale.toFixed(2));
+  return nextScale;
 }
 
 export function setTrustedPreviewHtml(

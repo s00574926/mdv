@@ -3,7 +3,11 @@ import "./styles.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
+  applyPreviewScale,
+  DEFAULT_PREVIEW_SCALE,
   clearPreview,
+  getNextPreviewScale,
+  isPreviewZoomShortcut,
   renderWorkspaceFrame,
   type WorkspacePayload
 } from "./view";
@@ -29,6 +33,7 @@ const elements = {
   explorerTree: queryRequired<HTMLElement>("#explorer-tree"),
   preview: queryRequired<HTMLElement>("#preview")
 };
+let previewScale = applyPreviewScale(elements.preview, DEFAULT_PREVIEW_SCALE);
 
 async function getMermaid(): Promise<MermaidInstance> {
   if (!mermaidInstancePromise) {
@@ -72,6 +77,22 @@ async function renderWorkspace(workspace: WorkspacePayload): Promise<void> {
 
   await renderMermaid();
 }
+
+elements.preview.addEventListener(
+  "wheel",
+  (event: WheelEvent) => {
+    if (!isPreviewZoomShortcut(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    previewScale = applyPreviewScale(
+      elements.preview,
+      getNextPreviewScale(previewScale, event.deltaY)
+    );
+  },
+  { passive: false }
+);
 
 elements.explorerTree.addEventListener("click", async (event: MouseEvent) => {
   const target = event.target;

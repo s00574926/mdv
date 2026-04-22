@@ -117,7 +117,9 @@ summary:focus-visible {
 }
 
 .markdown-body {
+  --preview-scale: 1;
   min-height: 100vh;
+  zoom: var(--preview-scale);
   padding: 1.4rem 1.6rem 2rem;
   line-height: 1.7;
 }
