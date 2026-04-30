@@ -83,6 +83,16 @@ impl AppState {
         })
     }
 
+    #[cfg(test)]
+    pub(crate) fn new_for_tests() -> Self {
+        Self {
+            session: Mutex::new(AppSession::default()),
+            recent_store_path: PathBuf::new(),
+            saved_window_state: None,
+            window_state_store_path: PathBuf::new(),
+        }
+    }
+
     pub(crate) fn restore_window_state<T: WindowStateTarget>(&self, window: &T) -> Result<()> {
         let Some(saved_window_state) = self.saved_window_state.as_ref() else {
             return Ok(());

@@ -194,7 +194,7 @@ pub fn active_document_content(state: &State<'_, AppState>) -> Result<String> {
     Ok(document.content.clone())
 }
 
-pub fn snapshot(state: &State<'_, AppState>) -> Result<WorkspaceSnapshot> {
+pub fn snapshot(state: &AppState) -> Result<WorkspaceSnapshot> {
     let session = lock_session(state)?;
     let active_document = session
         .active_document_index
@@ -311,7 +311,7 @@ fn untitled_label(untitled_number: Option<usize>) -> String {
 }
 
 fn lock_session<'a>(
-    state: &'a State<'a, AppState>,
+    state: &'a AppState,
 ) -> Result<std::sync::MutexGuard<'a, crate::state::AppSession>> {
     state
         .session

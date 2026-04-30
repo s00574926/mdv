@@ -227,10 +227,15 @@ pub fn save_active_document_to_path(
     )
 }
 
-pub fn reload_current_document(
-    _app: &AppHandle,
-    state: &State<'_, AppState>,
+pub fn reload_current_document<R: tauri::Runtime>(
+    _app: &AppHandle<R>,
+    state: &AppState,
 ) -> Result<WorkspacePayload> {
+    reload_current_document_from_state(state)
+}
+
+fn reload_current_document_from_state(state: &AppState) -> Result<WorkspacePayload> {
+    state.invalidate_rendered_document()?;
     current_workspace(state)
 }
 
@@ -243,7 +248,7 @@ pub fn update_document_content(
     current_workspace(state)
 }
 
-pub fn current_workspace(state: &State<'_, AppState>) -> Result<WorkspacePayload> {
+pub fn current_workspace(state: &AppState) -> Result<WorkspacePayload> {
     let snapshot = workspace_session::snapshot(state)?;
     let active_label = snapshot
         .active_document_index
@@ -520,7 +525,15 @@ fn ensure_markdown_file(path: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{ensure_markdown_file, normalize_save_path};
-    use std::path::{Path, PathBuf};
+    use crate::{markdown, state::AppState, test_support::filesystem_test_lock, trusted_preview};
+    use std::{
+        env, fs,
+        path::{Path, PathBuf},
+        sync::atomic::{AtomicU64, Ordering},
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    static NEXT_TEST_ID: AtomicU64 = AtomicU64::new(0);
 
     #[test]
     fn accepts_markdown_paths_case_insensitively() {
@@ -541,5 +554,72 @@ mod tests {
                 .expect("expected markdown path normalization"),
             PathBuf::from("notes.md")
         );
+    }
+
+    #[test]
+    fn reload_current_document_ignores_stale_render_cache() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let state = AppState::new_for_tests();
+        let path = unique_test_path("guide.md");
+
+        fs::write(&path, "# Fresh").expect("failed to write markdown file");
+        {
+            let mut session = state
+                .session
+                .lock()
+                .expect("state lock should be available");
+            session.documents.push(crate::state::OpenDocumentSession {
+                path: Some(path.clone()),
+                directory: None,
+                untitled_number: None,
+                content: String::new(),
+            });
+            session.active_document_index = Some(0);
+        }
+        state
+            .remember_rendered_document(&path, rendered_document("<h1>Stale</h1>"))
+            .expect("failed to seed rendered cache");
+
+        let workspace = super::reload_current_document_from_state(&state).expect("reload failed");
+
+        assert!(workspace.document.html.contains("Fresh"));
+        assert!(!workspace.document.html.contains("Stale"));
+
+        fs::remove_file(&path).expect("failed to remove markdown file");
+        cleanup_test_dir(&path);
+    }
+
+    fn rendered_document(html: &str) -> markdown::RenderedDocument {
+        markdown::RenderedDocument {
+            title: String::from("guide"),
+            html: html.to_string(),
+            source_name: String::from("guide.md"),
+            source_path: String::from("guide.md"),
+            watching: true,
+            trust_model: trusted_preview::TRUST_MODEL,
+        }
+    }
+
+    fn unique_test_path(name: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time before unix epoch")
+            .as_nanos();
+        let sequence = NEXT_TEST_ID.fetch_add(1, Ordering::Relaxed);
+        let path = env::temp_dir()
+            .join("mdv-tests")
+            .join(format!("{name}-{nonce}-{sequence}"));
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("failed to create test directory");
+        }
+        path
+    }
+
+    fn cleanup_test_dir(path: &Path) {
+        if let Some(parent) = path.parent()
+            && parent.exists()
+        {
+            let _ = fs::remove_dir_all(parent);
+        }
     }
 }
