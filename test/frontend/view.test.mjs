@@ -363,6 +363,33 @@ runTest("renderWorkspaceFrame injects trusted HTML and shows the untitled editor
   assert.equal(elements.preview.innerHTML, "");
 });
 
+runTest("renderWorkspaceFrame shows previews for untitled Mermaid documents", () => {
+  const elements = createElements();
+
+  renderWorkspaceFrame(
+    elements,
+    createWorkspace({
+      documentTabs: [{ label: "Untitled", isUntitled: true, hasUnsavedContent: true, isActive: true }],
+      activeDocumentIndex: 0,
+      document: {
+        title: "Untitled",
+        html: "<pre class=\"mermaid\">flowchart TD\n  A --&gt; B</pre>",
+        sourceName: "",
+        sourcePath: "",
+        watching: false,
+        trustModel: TRUSTED_PREVIEW_TRUST_MODEL
+      },
+      editorText: "flowchart TD\n  A --> B"
+    })
+  );
+
+  assert.equal(elements.editorPanel.hidden, false);
+  assert.equal(elements.editor.value, "flowchart TD\n  A --> B");
+  assert.equal(elements.preview.hidden, false);
+  assert.match(elements.preview.innerHTML, /class="mermaid"/);
+  assert.match(elements.preview.innerHTML, /flowchart TD/);
+});
+
 runTest("renderEditor only updates the text area when needed", () => {
   const elements = createElements();
   elements.editor.value = "# Existing";

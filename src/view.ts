@@ -399,8 +399,14 @@ export function renderWorkspaceFrame(elements: ViewElements, workspace: Workspac
   renderEditor(elements, workspace.editorText);
 
   if (workspace.editorText !== null) {
-    elements.preview.hidden = true;
-    clearPreview(elements.preview);
+    if (!shouldShowEditorPreview(workspace)) {
+      elements.preview.hidden = true;
+      clearPreview(elements.preview);
+      return;
+    }
+
+    elements.preview.hidden = false;
+    setTrustedPreviewHtml(elements.preview, workspace.document);
     return;
   }
 
