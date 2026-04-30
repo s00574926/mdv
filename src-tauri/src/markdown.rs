@@ -224,6 +224,10 @@ fn is_mermaid_root_line(line: &str) -> bool {
         return true;
     }
 
+    if is_mermaid_git_graph_root_line(line) {
+        return true;
+    }
+
     const MERMAID_EXACT_ROOTS: &[&str] = &[
         "sequenceDiagram",
         "classDiagram",
@@ -233,7 +237,6 @@ fn is_mermaid_root_line(line: &str) -> bool {
         "erDiagram",
         "journey",
         "gantt",
-        "gitGraph",
         "mindmap",
         "timeline",
         "zenuml",
@@ -256,6 +259,26 @@ fn is_mermaid_root_line(line: &str) -> bool {
     ];
 
     MERMAID_EXACT_ROOTS.contains(&line)
+}
+
+fn is_mermaid_git_graph_root_line(line: &str) -> bool {
+    let Some(suffix) = line.strip_prefix("gitGraph") else {
+        return false;
+    };
+
+    if suffix.is_empty() {
+        return true;
+    }
+
+    if !suffix.chars().next().is_some_and(char::is_whitespace) {
+        return false;
+    }
+
+    suffix
+        .split_whitespace()
+        .next()
+        .map(|token| token.trim_end_matches(':'))
+        .is_some_and(is_mermaid_flow_direction)
 }
 
 fn is_mermaid_pie_root_line(line: &str) -> bool {
@@ -523,10 +546,26 @@ pie title Release split
     }
 
     #[test]
+    fn renders_raw_mermaid_git_graph_documents_with_direction() {
+        let rendered = untitled_document(
+            "Untitled",
+            r#"
+gitGraph TB:
+  commit id: "init"
+"#,
+        );
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("gitGraph TB:"));
+        assert!(!rendered.html.contains("<p>gitGraph TB:"));
+    }
+
+    #[test]
     fn does_not_treat_plain_text_as_raw_mermaid() {
         assert!(!looks_like_raw_mermaid_document("graph theory is fun"));
         assert!(!looks_like_raw_mermaid_document("graphTD"));
         assert!(!looks_like_raw_mermaid_document("flowchartLR"));
+        assert!(!looks_like_raw_mermaid_document("gitGraph is fun"));
         assert!(!looks_like_raw_mermaid_document(
             "pie is better with coffee"
         ));
@@ -546,6 +585,16 @@ pie title Release split
         let compact_graph_word = untitled_document("Untitled", "graphTD");
         assert!(compact_graph_word.html.contains("<p>graphTD</p>"));
         assert!(!compact_graph_word.html.contains("<pre class=\"mermaid\">"));
+
+        let plain_git_graph_sentence = untitled_document("Untitled", "gitGraph is fun");
+        assert!(
+            plain_git_graph_sentence
+                .html
+                .contains("<p>gitGraph is fun</p>")
+        );
+        assert!(!plain_git_graph_sentence
+            .html
+            .contains("<pre class=\"mermaid\">"));
     }
 
     #[test]
