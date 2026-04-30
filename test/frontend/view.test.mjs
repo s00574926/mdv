@@ -449,6 +449,7 @@ runTest("preview zoom steps and clamps the scale range", () => {
   assert.equal(getNextPreviewScale(MAX_PREVIEW_SCALE, -120), MAX_PREVIEW_SCALE);
   assert.equal(clampPreviewScale(99), MAX_PREVIEW_SCALE);
   assert.equal(clampPreviewScale(0.01), MIN_PREVIEW_SCALE);
+  assert.equal(clampPreviewScale(Number.NaN), DEFAULT_PREVIEW_SCALE);
 });
 
 runTest("applyPreviewScale writes the preview scale css variable", () => {

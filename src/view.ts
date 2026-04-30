@@ -125,6 +125,10 @@ export function isPreviewZoomShortcut(event: Pick<WheelEvent, "ctrlKey" | "metaK
 }
 
 export function clampPreviewScale(scale: number): number {
+  if (!Number.isFinite(scale)) {
+    return DEFAULT_PREVIEW_SCALE;
+  }
+
   return Number(Math.min(MAX_PREVIEW_SCALE, Math.max(MIN_PREVIEW_SCALE, scale)).toFixed(2));
 }
 
