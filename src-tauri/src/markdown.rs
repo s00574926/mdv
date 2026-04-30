@@ -257,19 +257,23 @@ fn is_mermaid_flow_direction(token: &str) -> bool {
 }
 
 fn mermaid_fence_start(line: &str) -> Option<(char, usize)> {
-    let trimmed = line.trim_start();
-    let marker = trimmed.chars().next()?;
+    let (indent, content) = split_indentation(line);
+    if indent > 3 {
+        return None;
+    }
+
+    let marker = content.chars().next()?;
 
     if marker != '`' && marker != '~' {
         return None;
     }
 
-    let fence_length = trimmed.chars().take_while(|ch| *ch == marker).count();
+    let fence_length = content.chars().take_while(|ch| *ch == marker).count();
     if fence_length < 3 {
         return None;
     }
 
-    let info = trimmed[fence_length..].trim();
+    let info = content[fence_length..].trim();
     let language = info.split_whitespace().next()?;
 
     if language.eq_ignore_ascii_case("mermaid") {
@@ -280,10 +284,28 @@ fn mermaid_fence_start(line: &str) -> Option<(char, usize)> {
 }
 
 fn is_fence_close(line: &str, marker: char, fence_length: usize) -> bool {
-    let trimmed = line.trim_start();
-    let run_length = trimmed.chars().take_while(|ch| *ch == marker).count();
+    let (indent, content) = split_indentation(line);
+    if indent > 3 {
+        return false;
+    }
 
-    run_length >= fence_length && trimmed[run_length..].trim().is_empty()
+    let run_length = content.chars().take_while(|ch| *ch == marker).count();
+
+    run_length >= fence_length && content[run_length..].trim().is_empty()
+}
+
+fn split_indentation(line: &str) -> (usize, &str) {
+    let mut columns = 0usize;
+
+    for (index, ch) in line.char_indices() {
+        match ch {
+            ' ' => columns += 1,
+            '\t' => columns += 4 - (columns % 4),
+            _ => return (columns, &line[index..]),
+        }
+    }
+
+    (columns, "")
 }
 
 fn escape_html(input: &str) -> String {
@@ -362,6 +384,22 @@ fn main() {
         let rewritten = rewrite_mermaid_blocks(input);
 
         assert!(rewritten.contains("```rust"));
+        assert!(!rewritten.contains("<pre class=\"mermaid\">"));
+    }
+
+    #[test]
+    fn leaves_indented_mermaid_fences_as_code_blocks() {
+        let input = r#"
+    ```mermaid
+    flowchart TD
+      A --> B
+    ```
+"#;
+
+        let rewritten = rewrite_mermaid_blocks(input);
+
+        assert!(rewritten.contains("```mermaid"));
+        assert!(rewritten.contains("flowchart TD"));
         assert!(!rewritten.contains("<pre class=\"mermaid\">"));
     }
 
