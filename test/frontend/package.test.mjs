@@ -7,6 +7,10 @@ const packageJson = JSON.parse(
 const tauriConfig = JSON.parse(
   readFileSync(new URL("../../src-tauri/tauri.conf.json", import.meta.url), "utf8")
 );
+const rustWorkflow = readFileSync(
+  new URL("../../.github/workflows/rust.yml", import.meta.url),
+  "utf8"
+);
 
 function runTest(name, fn) {
   try {
@@ -38,6 +42,22 @@ runTest("tauri build commands avoid platform-specific npm command shims", () => 
       command,
       /\bnpm\.cmd\b/i,
       `${name} should use npm, not the Windows-only npm.cmd shim`
+    );
+  }
+});
+
+runTest("ubuntu rust workflow installs Tauri Linux system dependencies", () => {
+  for (const packageName of [
+    "libwebkit2gtk-4.1-dev",
+    "libxdo-dev",
+    "libssl-dev",
+    "libayatana-appindicator3-dev",
+    "librsvg2-dev"
+  ]) {
+    assert.match(
+      rustWorkflow,
+      new RegExp(`\\b${packageName}\\b`),
+      `Rust workflow should install ${packageName} before building Tauri on Ubuntu`
     );
   }
 });
