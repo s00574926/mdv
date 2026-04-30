@@ -190,7 +190,7 @@ fn validate_diagram(diagram: &MermaidClipboardDiagram) -> Result<()> {
         bail!("No Mermaid diagram is available to copy.");
     }
 
-    if diagram.width <= 0.0 || diagram.height <= 0.0 {
+    if !valid_dimension(diagram.width) || !valid_dimension(diagram.height) {
         bail!("Mermaid diagram does not have a valid size.");
     }
 
@@ -198,7 +198,7 @@ fn validate_diagram(diagram: &MermaidClipboardDiagram) -> Result<()> {
 }
 
 fn compute_target_bounds(source_width: f64, source_height: f64) -> Result<TargetBounds> {
-    if source_width <= 0.0 || source_height <= 0.0 {
+    if !valid_dimension(source_width) || !valid_dimension(source_height) {
         bail!("Mermaid diagram dimensions must be positive.");
     }
 
@@ -214,6 +214,10 @@ fn compute_target_bounds(source_width: f64, source_height: f64) -> Result<Target
         width,
         height,
     })
+}
+
+fn valid_dimension(value: f64) -> bool {
+    value.is_finite() && value > 0.0
 }
 
 struct ClipboardTempDir {
@@ -256,6 +260,24 @@ mod tests {
             error.to_string(),
             "Mermaid diagram does not have a valid size."
         );
+    }
+
+    #[test]
+    fn rejects_non_finite_diagram_dimensions() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg />"),
+            width: f64::NAN,
+            height: 120.0,
+        };
+
+        let error =
+            validate_diagram(&diagram).expect_err("expected non-finite Mermaid dimensions");
+        assert_eq!(
+            error.to_string(),
+            "Mermaid diagram does not have a valid size."
+        );
+
+        assert!(compute_target_bounds(f64::INFINITY, 120.0).is_err());
     }
 
     #[test]
