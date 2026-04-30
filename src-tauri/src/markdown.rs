@@ -77,6 +77,7 @@ fn render_markdown(
     markdown: &str,
     watching: bool,
 ) -> RenderedDocument {
+    let markdown = markdown.strip_prefix('\u{feff}').unwrap_or(markdown);
     let transformed = rewrite_mermaid_content(markdown);
     let html = markdown_to_html(&transformed, &trusted_preview::markdown_options());
 
@@ -388,6 +389,18 @@ sequenceDiagram
     }
 
     #[test]
+    fn rewrites_mermaid_fences_after_utf8_bom() {
+        let rendered = untitled_document(
+            "Untitled",
+            "\u{feff}```mermaid\nflowchart LR\n  A --> B\n```",
+        );
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("flowchart LR"));
+        assert!(!rendered.html.contains("```mermaid"));
+    }
+
+    #[test]
     fn leaves_non_mermaid_code_fences_untouched() {
         let input = r#"
 ```rust
@@ -436,6 +449,15 @@ flowchart TD
     }
 
     #[test]
+    fn renders_raw_mermaid_documents_with_utf8_bom() {
+        let rendered = untitled_document("Untitled", "\u{feff}flowchart TD\n  Start --> Finish");
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("flowchart TD"));
+        assert!(!rendered.html.contains("<p>"));
+    }
+
+    #[test]
     fn renders_raw_mermaid_pie_documents_with_title() {
         let rendered = untitled_document(
             "Untitled",
@@ -465,9 +487,11 @@ pie title Release split
         assert!(!rendered.html.contains("<pre class=\"mermaid\">"));
 
         let plain_pie_sentence = untitled_document("Untitled", "pie is better with coffee");
-        assert!(plain_pie_sentence
-            .html
-            .contains("<p>pie is better with coffee</p>"));
+        assert!(
+            plain_pie_sentence
+                .html
+                .contains("<p>pie is better with coffee</p>")
+        );
         assert!(!plain_pie_sentence.html.contains("<pre class=\"mermaid\">"));
 
         let compact_graph_word = untitled_document("Untitled", "graphTD");
