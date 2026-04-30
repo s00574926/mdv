@@ -129,7 +129,11 @@ fn should_skip_entry(name: &str, file_type: &fs::FileType) -> bool {
         return true;
     }
 
-    file_type.is_dir() && (name.starts_with('.') || SKIPPED_DIRECTORY_NAMES.contains(&name))
+    file_type.is_dir()
+        && (name.starts_with('.')
+            || SKIPPED_DIRECTORY_NAMES
+                .iter()
+                .any(|skipped_name| skipped_name.eq_ignore_ascii_case(name)))
 }
 
 #[cfg(test)]
@@ -242,6 +246,40 @@ mod tests {
         .expect("failed to write dependency markdown");
         fs::write(root.join(".git").join("hooks").join("notes.md"), "# Hidden")
             .expect("failed to write hidden markdown");
+
+        let scanned = scan_root(&root).expect("failed to scan root");
+
+        assert_eq!(scanned.root.children.len(), 1);
+        assert_eq!(scanned.root.children[0].name, "docs");
+        assert_eq!(
+            scanned.first_markdown,
+            Some(root.join("docs").join("guide.md"))
+        );
+
+        cleanup_test_dir(&root);
+    }
+
+    #[test]
+    fn skips_generated_directories_case_insensitively() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let root = unique_test_dir("explorer-skip-heavy-dirs-case");
+        fs::create_dir_all(root.join("docs")).expect("failed to create docs dir");
+        fs::create_dir_all(root.join("Node_Modules").join("pkg"))
+            .expect("failed to create mixed-case node_modules dir");
+        fs::create_dir_all(root.join("TARGET").join("debug"))
+            .expect("failed to create uppercase target dir");
+        fs::write(root.join("docs").join("guide.md"), "# Guide")
+            .expect("failed to write docs markdown");
+        fs::write(
+            root.join("Node_Modules").join("pkg").join("README.md"),
+            "# Dependency",
+        )
+        .expect("failed to write dependency markdown");
+        fs::write(
+            root.join("TARGET").join("debug").join("artifact.md"),
+            "# Artifact",
+        )
+        .expect("failed to write generated markdown");
 
         let scanned = scan_root(&root).expect("failed to scan root");
 
