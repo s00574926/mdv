@@ -388,10 +388,10 @@ fn sync_active_watchers(app: &AppHandle, state: &State<'_, AppState>) -> Result<
     if previous_document_path.as_deref() != active_document.path.as_deref() {
         state.invalidate_rendered_document()?;
     }
-    if let Some(directory) = active_document.directory.as_ref() {
-        if previous_explorer_root.as_deref() != Some(directory.as_path()) {
-            state.invalidate_explorer_root(directory)?;
-        }
+    if let Some(directory) = active_document.directory.as_ref()
+        && previous_explorer_root.as_deref() != Some(directory.as_path())
+    {
+        state.invalidate_explorer_root(directory)?;
     }
 
     let current_document_watcher = active_document

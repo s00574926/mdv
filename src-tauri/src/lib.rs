@@ -24,13 +24,12 @@ pub fn run() {
                 return;
             }
 
-            if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
-                if let Err(error) = window
+            if matches!(event, tauri::WindowEvent::CloseRequested { .. })
+                && let Err(error) = window
                     .state::<state::AppState>()
                     .persist_window_state(window)
-                {
-                    eprintln!("failed to persist window state: {error:#}");
-                }
+            {
+                eprintln!("failed to persist window state: {error:#}");
             }
         })
         .setup(|app| {

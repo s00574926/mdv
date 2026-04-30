@@ -599,20 +599,19 @@ fn resolve_window_position(
         ));
     }
 
-    if let Some(saved_monitor_name) = saved_window_state.monitor_name.as_deref() {
-        if let Some(saved_monitor) = monitors
+    if let Some(saved_monitor_name) = saved_window_state.monitor_name.as_deref()
+        && let Some(saved_monitor) = monitors
             .iter()
             .find(|monitor| monitor.name.as_deref() == Some(saved_monitor_name))
-        {
-            return Some(clamp_position_to_monitor(
-                StoredPosition {
-                    x: saved_monitor.position.x + saved_window_state.monitor_offset.x,
-                    y: saved_monitor.position.y + saved_window_state.monitor_offset.y,
-                },
-                saved_window_state.outer_size,
-                saved_monitor,
-            ));
-        }
+    {
+        return Some(clamp_position_to_monitor(
+            StoredPosition {
+                x: saved_monitor.position.x + saved_window_state.monitor_offset.x,
+                y: saved_monitor.position.y + saved_window_state.monitor_offset.y,
+            },
+            saved_window_state.outer_size,
+            saved_monitor,
+        ));
     }
 
     if let Some(saved_monitor) = saved_window_state
@@ -924,11 +923,10 @@ mod tests {
 
         cache_rendered_document(&mut session, &path, rendered_document("# Guide", false));
 
-        assert_eq!(
+        assert!(
             rendered_document_from_cache(&session, &path, true)
                 .expect("expected cached document")
-                .watching,
-            true
+                .watching
         );
         assert!(
             rendered_document_from_cache(&session, Path::new(r"C:\docs\other.md"), true).is_none()
@@ -938,9 +936,11 @@ mod tests {
     #[test]
     fn explorer_payload_is_omitted_when_the_same_tree_is_already_sent() {
         let directory = PathBuf::from(r"C:\docs");
-        let mut session = AppSession::default();
-        session.last_sent_explorer_root = Some(directory.clone());
-        session.explorer_dirty = false;
+        let session = AppSession {
+            last_sent_explorer_root: Some(directory.clone()),
+            explorer_dirty: false,
+            ..Default::default()
+        };
 
         assert_eq!(
             session.last_sent_explorer_root.as_deref(),
@@ -1014,10 +1014,10 @@ mod tests {
     }
 
     fn cleanup_test_dir(path: &Path) {
-        if let Some(parent) = path.parent() {
-            if parent.exists() {
-                let _ = fs::remove_dir_all(parent);
-            }
+        if let Some(parent) = path.parent()
+            && parent.exists()
+        {
+            let _ = fs::remove_dir_all(parent);
         }
     }
 }
