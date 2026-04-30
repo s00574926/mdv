@@ -102,24 +102,27 @@ fn should_refresh_current_document(event: &Event, watched_path: &Path) -> bool {
 }
 
 fn should_refresh_workspace_explorer(event: &Event, watched_root: &Path) -> bool {
-    let affects_workspace = event.paths.iter().any(|candidate| {
-        path_is_within_root(candidate, watched_root) && path_may_affect_explorer(candidate)
-    });
+    let paths_in_workspace = event
+        .paths
+        .iter()
+        .filter(|candidate| path_is_within_root(candidate, watched_root))
+        .collect::<Vec<_>>();
 
-    if !affects_workspace {
+    if paths_in_workspace.is_empty() {
         return false;
     }
 
-    if event.kind.is_create() || event.kind.is_remove() {
+    if event.kind.is_create()
+        || event.kind.is_remove()
+        || event.kind.is_modify() && event.paths.len() > 1
+    {
         return true;
     }
 
     event.kind.is_modify()
-        && (event.paths.len() > 1
-            || event
-                .paths
-                .iter()
-                .any(|candidate| candidate.extension().is_none()))
+        && paths_in_workspace
+            .iter()
+            .any(|candidate| path_may_affect_explorer(candidate))
 }
 
 fn path_is_within_root(candidate: &Path, watched_root: &Path) -> bool {
@@ -302,6 +305,19 @@ mod tests {
         fs::create_dir_all(&root).expect("failed to create root");
 
         let event = Event::new(EventKind::Remove(RemoveKind::File)).add_path(root.join("gone.md"));
+        assert!(should_refresh_workspace_explorer(&event, &root));
+
+        cleanup_test_dir(&root);
+    }
+
+    #[test]
+    fn directory_events_with_dots_refresh_workspace_explorer() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let root = unique_test_path("workspace");
+        fs::create_dir_all(&root).expect("failed to create root");
+
+        let event =
+            Event::new(EventKind::Remove(RemoveKind::Folder)).add_path(root.join("docs.v1"));
         assert!(should_refresh_workspace_explorer(&event, &root));
 
         cleanup_test_dir(&root);
