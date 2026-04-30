@@ -124,7 +124,9 @@ impl AppState {
                 .lock()
                 .map_err(|_| anyhow::anyhow!("The preview state is unavailable."))?;
 
-            session.recent_paths.retain(|candidate| candidate != path);
+            session
+                .recent_paths
+                .retain(|candidate| !same_recent_path(candidate, path));
             session.recent_paths.insert(0, path.to_path_buf());
             session.recent_paths.truncate(MAX_RECENT_FILES);
         }
@@ -495,6 +497,37 @@ fn persist_recent_paths(path: &Path, recent_paths: &[PathBuf]) -> Result<()> {
     let contents = serde_json::to_string_pretty(&store)?;
 
     fs::write(path, contents).with_context(|| format!("Failed to write {}", path.display()))
+}
+
+fn same_recent_path(left: &Path, right: &Path) -> bool {
+    #[cfg(windows)]
+    {
+        recent_path_key(left) == recent_path_key(right)
+    }
+
+    #[cfg(not(windows))]
+    {
+        left == right
+    }
+}
+
+#[cfg(windows)]
+fn recent_path_key(path: &Path) -> String {
+    const VERBATIM_UNC_PREFIX: &str = r"\\?\UNC\";
+    const VERBATIM_PREFIX: &str = r"\\?\";
+
+    let path = path.to_string_lossy();
+    let lower_path = path.to_lowercase();
+
+    if lower_path.starts_with(&VERBATIM_UNC_PREFIX.to_lowercase()) {
+        return format!(r"\\{}", &path[VERBATIM_UNC_PREFIX.len()..]).to_lowercase();
+    }
+
+    if lower_path.starts_with(&VERBATIM_PREFIX.to_lowercase()) {
+        return path[VERBATIM_PREFIX.len()..].to_lowercase();
+    }
+
+    lower_path
 }
 
 fn load_window_state(path: &Path) -> Option<SavedWindowState> {
@@ -931,6 +964,19 @@ mod tests {
         assert!(
             rendered_document_from_cache(&session, Path::new(r"C:\docs\other.md"), true).is_none()
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn recent_path_matching_is_case_insensitive_on_windows() {
+        assert!(super::same_recent_path(
+            Path::new(r"C:\Docs\Plan.md"),
+            Path::new(r"c:\docs\plan.md")
+        ));
+        assert!(super::same_recent_path(
+            Path::new(r"\\?\UNC\server\share\Plan.md"),
+            Path::new(r"\\server\share\plan.md")
+        ));
     }
 
     #[test]
