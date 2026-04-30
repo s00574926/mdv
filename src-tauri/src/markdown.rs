@@ -61,6 +61,10 @@ pub fn new_document() -> RenderedDocument {
     }
 }
 
+pub fn untitled_document(title: &str, markdown: &str) -> RenderedDocument {
+    render_markdown(title, "", "", markdown, false)
+}
+
 pub fn folder_placeholder_document(path: &Path) -> RenderedDocument {
     let _ = path;
     new_document()
@@ -73,7 +77,7 @@ fn render_markdown(
     markdown: &str,
     watching: bool,
 ) -> RenderedDocument {
-    let transformed = rewrite_mermaid_blocks(markdown);
+    let transformed = rewrite_mermaid_content(markdown);
     let html = markdown_to_html(&transformed, &trusted_preview::markdown_options());
 
     RenderedDocument {
@@ -84,6 +88,19 @@ fn render_markdown(
         watching,
         trust_model: trusted_preview::TRUST_MODEL,
     }
+}
+
+fn rewrite_mermaid_content(markdown: &str) -> String {
+    let rewritten = rewrite_mermaid_blocks(markdown);
+    if rewritten.contains("<pre class=\"mermaid\">") {
+        return rewritten;
+    }
+
+    if let Some(raw_mermaid) = render_raw_mermaid_document(markdown) {
+        return raw_mermaid;
+    }
+
+    rewritten
 }
 
 fn rewrite_mermaid_blocks(markdown: &str) -> String {
@@ -133,6 +150,99 @@ fn rewrite_mermaid_blocks(markdown: &str) -> String {
     }
 
     output
+}
+
+fn render_raw_mermaid_document(markdown: &str) -> Option<String> {
+    if !looks_like_raw_mermaid_document(markdown) {
+        return None;
+    }
+
+    let trimmed = markdown.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    Some(format!(
+        "<pre class=\"mermaid\">{}</pre>\n",
+        escape_html(trimmed)
+    ))
+}
+
+fn looks_like_raw_mermaid_document(markdown: &str) -> bool {
+    if markdown.trim().is_empty() || markdown.contains("```") || markdown.contains("~~~") {
+        return false;
+    }
+
+    markdown
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty() && !line.starts_with("%%"))
+        .is_some_and(is_mermaid_root_line)
+}
+
+fn is_mermaid_root_line(line: &str) -> bool {
+    if let Some(suffix) = line.strip_prefix("graph") {
+        return suffix.is_empty()
+            || suffix
+                .split_whitespace()
+                .next()
+                .is_some_and(is_mermaid_flow_direction);
+    }
+
+    if let Some(suffix) = line.strip_prefix("flowchart") {
+        return suffix.is_empty()
+            || suffix
+                .split_whitespace()
+                .next()
+                .is_some_and(is_mermaid_flow_direction);
+    }
+
+    const MERMAID_ROOTS: &[&str] = &[
+        "sequenceDiagram",
+        "classDiagram",
+        "classDiagram-v2",
+        "stateDiagram",
+        "stateDiagram-v2",
+        "erDiagram",
+        "journey",
+        "gantt",
+        "pie",
+        "gitGraph",
+        "mindmap",
+        "timeline",
+        "zenuml",
+        "quadrantChart",
+        "requirementDiagram",
+        "sankey-beta",
+        "architecture-beta",
+        "block-beta",
+        "kanban",
+        "packet-beta",
+        "xychart",
+        "xychart-beta",
+        "radar-beta",
+        "treemap-beta",
+        "C4Context",
+        "C4Container",
+        "C4Component",
+        "C4Dynamic",
+        "C4Deployment",
+    ];
+
+    MERMAID_ROOTS.iter().any(|root| {
+        line == *root
+            || line
+                .strip_prefix(root)
+                .and_then(|suffix| suffix.chars().next())
+                .is_some_and(char::is_whitespace)
+    })
+}
+
+fn is_mermaid_flow_direction(token: &str) -> bool {
+    matches!(
+        token.trim_end_matches(';'),
+        "TB" | "TD" | "BT" | "RL" | "LR"
+    )
 }
 
 fn mermaid_fence_start(line: &str) -> Option<(char, usize)> {
@@ -190,7 +300,10 @@ fn file_name(path: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{new_document, render_file, rewrite_mermaid_blocks};
+    use super::{
+        looks_like_raw_mermaid_document, new_document, render_file, rewrite_mermaid_blocks,
+        untitled_document,
+    };
     use std::{fs, path::PathBuf};
 
     use crate::trusted_preview::TRUST_MODEL;
@@ -239,6 +352,31 @@ fn main() {
 
         assert!(rewritten.contains("```rust"));
         assert!(!rewritten.contains("<pre class=\"mermaid\">"));
+    }
+
+    #[test]
+    fn renders_raw_mermaid_documents_without_fences() {
+        let rendered = untitled_document(
+            "Untitled",
+            r#"
+flowchart TD
+  Start --> Finish
+"#,
+        );
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("flowchart TD"));
+        assert!(rendered.html.contains("Start --&gt; Finish"));
+        assert!(!rendered.html.contains("<p>flowchart TD"));
+    }
+
+    #[test]
+    fn does_not_treat_plain_text_as_raw_mermaid() {
+        assert!(!looks_like_raw_mermaid_document("graph theory is fun"));
+
+        let rendered = untitled_document("Untitled", "graph theory is fun");
+        assert!(rendered.html.contains("<p>graph theory is fun</p>"));
+        assert!(!rendered.html.contains("<pre class=\"mermaid\">"));
     }
 
     #[test]
@@ -299,6 +437,11 @@ fn main() {
     fn trusted_preview_documents_are_explicitly_marked() {
         let empty = new_document();
         assert_eq!(empty.trust_model, TRUST_MODEL);
+
+        let untitled = untitled_document("Untitled", "# Draft");
+        assert_eq!(untitled.title, "Untitled");
+        assert_eq!(untitled.trust_model, TRUST_MODEL);
+        assert!(untitled.html.contains("<h1>Draft</h1>"));
 
         let rendered = render_file(&fixture_path("flow-and-sequence.md"), false)
             .expect("failed to render trusted preview fixture");

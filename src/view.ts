@@ -29,9 +29,20 @@ export interface ExplorerRoot {
 
 export interface WorkspacePayload {
   document: RenderedDocument;
+  editorText: string | null;
   currentFilePath: string | null;
   explorer: ExplorerRoot | null;
+  explorerUpdated: boolean;
   recentPaths: string[];
+  documentTabs: DocumentTab[];
+  activeDocumentIndex: number | null;
+}
+
+export interface DocumentTab {
+  label: string;
+  isUntitled: boolean;
+  hasUnsavedContent: boolean;
+  isActive: boolean;
 }
 
 interface ClassListLike {
@@ -45,6 +56,7 @@ interface StyleLike {
 
 interface PreviewLike {
   innerHTML: string;
+  hidden: boolean;
   style?: StyleLike;
 }
 
@@ -56,10 +68,31 @@ interface ExplorerTreeLike {
   innerHTML: string;
 }
 
+interface DocumentTabsPanelLike {
+  hidden: boolean;
+}
+
+interface DocumentTabsLike {
+  innerHTML: string;
+}
+
+interface EditorPanelLike {
+  hidden: boolean;
+}
+
+interface EditorLike {
+  value: string;
+  readOnly?: boolean;
+}
+
 export interface ViewElements {
   appRoot: {
     classList: ClassListLike;
   };
+  documentTabsPanel: DocumentTabsPanelLike;
+  documentTabs: DocumentTabsLike;
+  editorPanel: EditorPanelLike;
+  editor: EditorLike;
   explorerPanel: ExplorerPanelLike;
   explorerTree: ExplorerTreeLike;
   preview: PreviewLike;
@@ -67,6 +100,24 @@ export interface ViewElements {
 
 export function clearPreview(preview: PreviewLike): void {
   preview.innerHTML = "";
+}
+
+export function renderEditor(
+  elements: Pick<ViewElements, "editorPanel" | "editor">,
+  editorText: string | null
+): void {
+  if (editorText === null) {
+    elements.editorPanel.hidden = true;
+    if (elements.editor.value) {
+      elements.editor.value = "";
+    }
+    return;
+  }
+
+  elements.editorPanel.hidden = false;
+  if (elements.editor.value !== editorText) {
+    elements.editor.value = editorText;
+  }
 }
 
 export function isPreviewZoomShortcut(event: Pick<WheelEvent, "ctrlKey" | "metaKey">): boolean {
@@ -90,6 +141,34 @@ export function applyPreviewScale(preview: PreviewLike, scale: number): number {
   const nextScale = clampPreviewScale(scale);
   preview.style?.setProperty("--preview-scale", nextScale.toFixed(2));
   return nextScale;
+}
+
+export interface ContextMenuPositionRequest {
+  left: number;
+  top: number;
+  menuWidth: number;
+  menuHeight: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  margin?: number;
+}
+
+export function clampContextMenuPosition({
+  left,
+  top,
+  menuWidth,
+  menuHeight,
+  viewportWidth,
+  viewportHeight,
+  margin = 8
+}: ContextMenuPositionRequest): { left: number; top: number } {
+  const maxLeft = Math.max(margin, viewportWidth - menuWidth - margin);
+  const maxTop = Math.max(margin, viewportHeight - menuHeight - margin);
+
+  return {
+    left: Math.min(Math.max(left, margin), maxLeft),
+    top: Math.min(Math.max(top, margin), maxTop)
+  };
 }
 
 export function setTrustedPreviewHtml(
@@ -138,6 +217,107 @@ export function renderExplorerNode(node: ExplorerNode, currentFilePath: string |
   `;
 }
 
+function sameExplorerNodes(left: ExplorerNode[], right: ExplorerNode[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index += 1) {
+    const leftNode = left[index];
+    const rightNode = right[index];
+
+    if (
+      leftNode.name !== rightNode.name ||
+      leftNode.path !== rightNode.path ||
+      leftNode.kind !== rightNode.kind ||
+      !sameExplorerNodes(leftNode.children, rightNode.children)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function sameExplorer(
+  left: ExplorerRoot | null | undefined,
+  right: ExplorerRoot | null | undefined
+): boolean {
+  if (left === right) {
+    return true;
+  }
+
+  if (!left || !right) {
+    return left === right;
+  }
+
+  return left.name === right.name && left.path === right.path && sameExplorerNodes(left.children, right.children);
+}
+
+export function sameDocumentTabs(
+  left: DocumentTab[] | undefined,
+  right: DocumentTab[] | undefined
+): boolean {
+  if (left === right) {
+    return true;
+  }
+
+  if (!left || !right || left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index += 1) {
+    const leftTab = left[index];
+    const rightTab = right[index];
+
+    if (
+      leftTab.label !== rightTab.label ||
+      leftTab.isUntitled !== rightTab.isUntitled ||
+      leftTab.hasUnsavedContent !== rightTab.hasUnsavedContent ||
+      leftTab.isActive !== rightTab.isActive
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export function hasUnsavedUntitledContent(documentTab: DocumentTab | null | undefined): boolean {
+  return Boolean(documentTab?.isUntitled && documentTab?.hasUnsavedContent);
+}
+
+export function getUnsavedUntitledDocumentIndexes(documentTabs: DocumentTab[] | undefined): number[] {
+  if (!documentTabs?.length) {
+    return [];
+  }
+
+  return documentTabs.reduce<number[]>((indexes, documentTab, index) => {
+    if (hasUnsavedUntitledContent(documentTab)) {
+      indexes.push(index);
+    }
+    return indexes;
+  }, []);
+}
+
+export function sameRecentPaths(left: string[] | undefined, right: string[] | undefined): boolean {
+  if (left === right) {
+    return true;
+  }
+
+  if (!left || !right || left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export function renderExplorer(
   elements: Pick<ViewElements, "appRoot" | "explorerPanel" | "explorerTree">,
   explorer: ExplorerRoot | null,
@@ -157,8 +337,67 @@ export function renderExplorer(
     .join("");
 }
 
+export function renderDocumentTabs(
+  elements: Pick<ViewElements, "documentTabsPanel" | "documentTabs">,
+  documentTabs: DocumentTab[]
+): void {
+  if (!documentTabs.length) {
+    elements.documentTabsPanel.hidden = true;
+    elements.documentTabs.innerHTML = "";
+    return;
+  }
+
+  elements.documentTabsPanel.hidden = false;
+  elements.documentTabs.innerHTML = documentTabs
+    .map(
+      (documentTab, index) => `
+        <div class="document-tab-item${documentTab.isActive ? " document-tab-active" : ""}">
+          <button
+            type="button"
+            class="document-tab"
+            data-document-index="${index}"
+            aria-current="${documentTab.isActive ? "page" : "false"}"
+            aria-label="${escapeAttribute(documentTab.label)}"
+          >
+            <span class="document-tab-label">${escapeAttribute(documentTab.label)}</span>
+          </button>
+          <button
+            type="button"
+            class="document-tab-close"
+            data-close-document-index="${index}"
+            aria-label="Close ${escapeAttribute(documentTab.label)} tab"
+          >
+            <svg class="document-tab-close-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path
+                d="M4.25 4.25 11.75 11.75M11.75 4.25 4.25 11.75"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+              ></path>
+            </svg>
+          </button>
+        </div>
+      `
+    )
+    .join("");
+}
+
+export function shouldShowEditorPreview(workspace: WorkspacePayload): boolean {
+  return workspace.editorText !== null && workspace.document.html.includes('class="mermaid"');
+}
+
 export function renderWorkspaceFrame(elements: ViewElements, workspace: WorkspacePayload): void {
   renderExplorer(elements, workspace.explorer, workspace.currentFilePath);
+  renderDocumentTabs(elements, workspace.documentTabs);
+  renderEditor(elements, workspace.editorText);
+
+  if (workspace.editorText !== null) {
+    elements.preview.hidden = true;
+    clearPreview(elements.preview);
+    return;
+  }
+
+  elements.preview.hidden = false;
 
   if (!workspace.document.html) {
     clearPreview(elements.preview);

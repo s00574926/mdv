@@ -11,14 +11,17 @@
   },
   "app": {
     "windows": [
-      {
-        "label": "main",
-        "title": "mdv",
-        "width": 1440,
-        "height": 960,
-        "minWidth": 900,
+        {
+          "label": "main",
+          "title": "mdv",
+          "visible": false,
+          "width": 1440,
+          "height": 960,
+          "minWidth": 900,
         "minHeight": 640,
-        "resizable": true
+        "resizable": true,
+        "decorations": false,
+        "shadow": true
       }
     ],
     "security": {
@@ -38,6 +41,7 @@
   },
   "bundle": {
     "active": true,
+    "icon": ["icons/icon.ico"],
     "targets": "all",
     "windows": {
       "webviewInstallMode": {

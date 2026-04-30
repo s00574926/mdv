@@ -9,13 +9,15 @@ npm.cmd install
 npm.cmd run tauri dev
 ```
 
-Use the native `File` menu to open a Markdown file or folder. The app starts with a blank window and renders content only after you open something. [sample/example.md](/C:/work/mdv/sample/example.md:1) remains available as a bundled demo document.
+Use the hamburger menu in the custom title bar to open a Markdown file or folder. `New` opens an untitled tab with a Markdown textarea so you can paste or type content immediately, and untitled tabs expose `Save` / `Save As...` in that same menu to persist that text as a `.md` file. When an untitled draft renders Mermaid, mdv opens a live preview beneath the editor so pasted diagrams show up immediately. [sample/example.md](/C:/work/mdv/sample/example.md:1) remains available as a bundled demo document.
 
 ## What the app does
 
-- `File -> Open...` opens a single `.md` file.
-- `File -> Open Folder...` opens a workspace folder, shows a Markdown-only explorer, and lets you switch files from the sidebar.
-- `File -> Open Recent` reopens previously viewed Markdown files.
+- `New` opens another untitled tab with an editor, so you can keep more than one draft around at once.
+- `Save` and `Save As...` write the active untitled tab's current text to a Markdown file.
+- `Open...` opens a `.md` file in its own tab.
+- `Open Folder...` opens a workspace folder, shows a Markdown-only explorer, and lets you switch files from the sidebar.
+- `Open Recent` reopens previously viewed Markdown files.
 - The current document refreshes automatically when the file changes on disk.
 - When a folder is open, the explorer refreshes for Markdown file and directory changes inside that workspace.
 - In the preview pane, use `Ctrl` + mouse wheel on Windows/Linux or `Cmd` + mouse wheel on macOS to zoom in and out without changing normal scroll behavior.
