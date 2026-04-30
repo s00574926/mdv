@@ -660,21 +660,7 @@ fn resolve_window_position(
         ));
     }
 
-    if let Some(saved_monitor) = saved_window_state
-        .monitor_index
-        .and_then(|monitor_index| monitors.get(monitor_index))
-    {
-        return Some(clamp_position_to_monitor(
-            StoredPosition {
-                x: saved_monitor.position.x + saved_window_state.monitor_offset.x,
-                y: saved_monitor.position.y + saved_window_state.monitor_offset.y,
-            },
-            saved_window_state.outer_size,
-            saved_monitor,
-        ));
-    }
-
-    monitors
+    if let Some(position) = monitors
         .iter()
         .find(|monitor| {
             rects_intersect(
@@ -691,6 +677,25 @@ fn resolve_window_position(
                 monitor,
             )
         })
+    {
+        return Some(position);
+    }
+
+    if let Some(saved_monitor) = saved_window_state
+        .monitor_index
+        .and_then(|monitor_index| monitors.get(monitor_index))
+    {
+        return Some(clamp_position_to_monitor(
+            StoredPosition {
+                x: saved_monitor.position.x + saved_window_state.monitor_offset.x,
+                y: saved_monitor.position.y + saved_window_state.monitor_offset.y,
+            },
+            saved_window_state.outer_size,
+            saved_monitor,
+        ));
+    }
+
+    None
 }
 
 fn clamp_position_to_monitor(
@@ -967,6 +972,29 @@ mod tests {
             resolve_window_position(&monitors, &saved_window_state).expect("expected position");
 
         assert_eq!(position, StoredPosition { x: 2020, y: 80 });
+    }
+
+    #[test]
+    fn restore_prefers_visible_absolute_position_over_mismatched_monitor_index() {
+        let monitors = vec![
+            monitor("Primary", 0, 0, 1920, 1080),
+            monitor("Replacement", 1920, 0, 2560, 1440),
+        ];
+        let saved_window_state = saved_window_state(
+            Some("Secondary"),
+            Some(1),
+            StoredPosition { x: 40, y: 60 },
+            StoredPosition { x: 120, y: 80 },
+            StoredSize {
+                width: 1000,
+                height: 700,
+            },
+        );
+
+        let position =
+            resolve_window_position(&monitors, &saved_window_state).expect("expected position");
+
+        assert_eq!(position, StoredPosition { x: 120, y: 80 });
     }
 
     #[test]
