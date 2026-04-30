@@ -181,20 +181,12 @@ fn looks_like_raw_mermaid_document(markdown: &str) -> bool {
 }
 
 fn is_mermaid_root_line(line: &str) -> bool {
-    if let Some(suffix) = line.strip_prefix("graph") {
-        return suffix.is_empty()
-            || suffix
-                .split_whitespace()
-                .next()
-                .is_some_and(is_mermaid_flow_direction);
+    if is_mermaid_flow_root_line(line, "graph") {
+        return true;
     }
 
-    if let Some(suffix) = line.strip_prefix("flowchart") {
-        return suffix.is_empty()
-            || suffix
-                .split_whitespace()
-                .next()
-                .is_some_and(is_mermaid_flow_direction);
+    if is_mermaid_flow_root_line(line, "flowchart") {
+        return true;
     }
 
     const MERMAID_ROOTS: &[&str] = &[
@@ -236,6 +228,25 @@ fn is_mermaid_root_line(line: &str) -> bool {
                 .and_then(|suffix| suffix.chars().next())
                 .is_some_and(char::is_whitespace)
     })
+}
+
+fn is_mermaid_flow_root_line(line: &str, root: &str) -> bool {
+    let Some(suffix) = line.strip_prefix(root) else {
+        return false;
+    };
+
+    if suffix.is_empty() {
+        return true;
+    }
+
+    if !suffix.chars().next().is_some_and(char::is_whitespace) {
+        return false;
+    }
+
+    suffix
+        .split_whitespace()
+        .next()
+        .is_some_and(is_mermaid_flow_direction)
 }
 
 fn is_mermaid_flow_direction(token: &str) -> bool {
@@ -373,10 +384,16 @@ flowchart TD
     #[test]
     fn does_not_treat_plain_text_as_raw_mermaid() {
         assert!(!looks_like_raw_mermaid_document("graph theory is fun"));
+        assert!(!looks_like_raw_mermaid_document("graphTD"));
+        assert!(!looks_like_raw_mermaid_document("flowchartLR"));
 
         let rendered = untitled_document("Untitled", "graph theory is fun");
         assert!(rendered.html.contains("<p>graph theory is fun</p>"));
         assert!(!rendered.html.contains("<pre class=\"mermaid\">"));
+
+        let compact_graph_word = untitled_document("Untitled", "graphTD");
+        assert!(compact_graph_word.html.contains("<p>graphTD</p>"));
+        assert!(!compact_graph_word.html.contains("<pre class=\"mermaid\">"));
     }
 
     #[test]
