@@ -161,6 +161,36 @@ runTest("renderExplorer marks the active file and escapes file-path attributes",
   assert.match(elements.explorerTree.innerHTML, /data-file-path="C:\/docs\/&lt;draft&gt;&amp;&quot;quote&quot;\.md"/);
 });
 
+runTest("renderExplorer escapes file and directory names before injecting HTML", () => {
+  const elements = createElements();
+  const explorer = {
+    name: "docs",
+    path: "C:/docs",
+    children: [
+      {
+        name: "<img src=x onerror=alert(1)>",
+        path: "C:/docs/malicious-dir",
+        kind: "directory",
+        children: [
+          {
+            name: "<script>alert(1)</script>.md",
+            path: "C:/docs/malicious-dir/script.md",
+            kind: "file",
+            children: []
+          }
+        ]
+      }
+    ]
+  };
+
+  renderExplorer(elements, explorer, null);
+
+  assert.doesNotMatch(elements.explorerTree.innerHTML, /<img src=x/);
+  assert.doesNotMatch(elements.explorerTree.innerHTML, /<script>/);
+  assert.match(elements.explorerTree.innerHTML, /&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.match(elements.explorerTree.innerHTML, /&lt;script&gt;alert\(1\)&lt;\/script&gt;\.md/);
+});
+
 runTest("sameExplorer only reports changes when the tree content changes", () => {
   const left = {
     name: "docs",

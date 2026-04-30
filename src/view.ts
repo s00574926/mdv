@@ -185,9 +185,12 @@ export function setTrustedPreviewHtml(
 }
 
 export function escapeAttribute(value: string): string {
+  return escapeHtml(value).replaceAll("\"", "&quot;");
+}
+
+function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
-    .replaceAll("\"", "&quot;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
 }
@@ -197,7 +200,7 @@ export function renderExplorerNode(node: ExplorerNode, currentFilePath: string |
     const children = node.children.map((child) => renderExplorerNode(child, currentFilePath)).join("");
     return `
       <details class="tree-directory">
-        <summary>${node.name}</summary>
+        <summary>${escapeHtml(node.name)}</summary>
         <div class="tree-children">${children}</div>
       </details>
     `;
@@ -212,7 +215,7 @@ export function renderExplorerNode(node: ExplorerNode, currentFilePath: string |
       role="treeitem"
       aria-current="${isActive ? "page" : "false"}"
     >
-      ${node.name}
+      ${escapeHtml(node.name)}
     </button>
   `;
 }
