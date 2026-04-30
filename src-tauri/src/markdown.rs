@@ -189,7 +189,11 @@ fn is_mermaid_root_line(line: &str) -> bool {
         return true;
     }
 
-    const MERMAID_ROOTS: &[&str] = &[
+    if is_mermaid_pie_root_line(line) {
+        return true;
+    }
+
+    const MERMAID_EXACT_ROOTS: &[&str] = &[
         "sequenceDiagram",
         "classDiagram",
         "classDiagram-v2",
@@ -198,7 +202,6 @@ fn is_mermaid_root_line(line: &str) -> bool {
         "erDiagram",
         "journey",
         "gantt",
-        "pie",
         "gitGraph",
         "mindmap",
         "timeline",
@@ -221,13 +224,26 @@ fn is_mermaid_root_line(line: &str) -> bool {
         "C4Deployment",
     ];
 
-    MERMAID_ROOTS.iter().any(|root| {
-        line == *root
-            || line
-                .strip_prefix(root)
-                .and_then(|suffix| suffix.chars().next())
-                .is_some_and(char::is_whitespace)
-    })
+    MERMAID_EXACT_ROOTS.contains(&line)
+}
+
+fn is_mermaid_pie_root_line(line: &str) -> bool {
+    let Some(suffix) = line.strip_prefix("pie") else {
+        return false;
+    };
+
+    if suffix.is_empty() {
+        return true;
+    }
+
+    if !suffix.chars().next().is_some_and(char::is_whitespace) {
+        return false;
+    }
+
+    suffix
+        .split_whitespace()
+        .next()
+        .is_some_and(|token| matches!(token, "title" | "showData"))
 }
 
 fn is_mermaid_flow_root_line(line: &str, root: &str) -> bool {
@@ -420,14 +436,39 @@ flowchart TD
     }
 
     #[test]
+    fn renders_raw_mermaid_pie_documents_with_title() {
+        let rendered = untitled_document(
+            "Untitled",
+            r#"
+pie title Release split
+  "Done" : 8
+  "Todo" : 2
+"#,
+        );
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("pie title Release split"));
+        assert!(!rendered.html.contains("<p>pie title Release split"));
+    }
+
+    #[test]
     fn does_not_treat_plain_text_as_raw_mermaid() {
         assert!(!looks_like_raw_mermaid_document("graph theory is fun"));
         assert!(!looks_like_raw_mermaid_document("graphTD"));
         assert!(!looks_like_raw_mermaid_document("flowchartLR"));
+        assert!(!looks_like_raw_mermaid_document(
+            "pie is better with coffee"
+        ));
 
         let rendered = untitled_document("Untitled", "graph theory is fun");
         assert!(rendered.html.contains("<p>graph theory is fun</p>"));
         assert!(!rendered.html.contains("<pre class=\"mermaid\">"));
+
+        let plain_pie_sentence = untitled_document("Untitled", "pie is better with coffee");
+        assert!(plain_pie_sentence
+            .html
+            .contains("<p>pie is better with coffee</p>"));
+        assert!(!plain_pie_sentence.html.contains("<pre class=\"mermaid\">"));
 
         let compact_graph_word = untitled_document("Untitled", "graphTD");
         assert!(compact_graph_word.html.contains("<p>graphTD</p>"));
