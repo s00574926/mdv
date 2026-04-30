@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use std::{
     env, fs,
@@ -190,11 +190,42 @@ fn validate_diagram(diagram: &MermaidClipboardDiagram) -> Result<()> {
         bail!("No Mermaid diagram is available to copy.");
     }
 
+    if !looks_like_svg_document(&diagram.svg) {
+        bail!("Mermaid diagram SVG is invalid.");
+    }
+
     if !valid_dimension(diagram.width) || !valid_dimension(diagram.height) {
         bail!("Mermaid diagram does not have a valid size.");
     }
 
     Ok(())
+}
+
+fn looks_like_svg_document(svg: &str) -> bool {
+    let document = svg.trim_start();
+    let document = if document
+        .get(..5)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("<?xml"))
+    {
+        let Some(end) = document.find("?>") else {
+            return false;
+        };
+        document[end + 2..].trim_start()
+    } else {
+        document
+    };
+
+    if !document
+        .get(..4)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("<svg"))
+    {
+        return false;
+    }
+
+    document[4..]
+        .chars()
+        .next()
+        .is_some_and(|next| next == '>' || next == '/' || next.is_ascii_whitespace())
 }
 
 fn compute_target_bounds(source_width: f64, source_height: f64) -> Result<TargetBounds> {
@@ -245,7 +276,7 @@ impl Drop for ClipboardTempDir {
 
 #[cfg(test)]
 mod tests {
-    use super::{MermaidClipboardDiagram, compute_target_bounds, validate_diagram};
+    use super::{compute_target_bounds, validate_diagram, MermaidClipboardDiagram};
 
     #[test]
     fn rejects_invalid_diagram_dimensions() {
@@ -270,14 +301,36 @@ mod tests {
             height: 120.0,
         };
 
-        let error =
-            validate_diagram(&diagram).expect_err("expected non-finite Mermaid dimensions");
+        let error = validate_diagram(&diagram).expect_err("expected non-finite Mermaid dimensions");
         assert_eq!(
             error.to_string(),
             "Mermaid diagram does not have a valid size."
         );
 
         assert!(compute_target_bounds(f64::INFINITY, 120.0).is_err());
+    }
+
+    #[test]
+    fn rejects_non_svg_clipboard_payloads() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<html><body>not an SVG</body></html>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        let error = validate_diagram(&diagram).expect_err("expected non-SVG payload rejection");
+        assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
+    }
+
+    #[test]
+    fn accepts_svg_clipboard_payloads_with_xml_declaration() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<?xml version=\"1.0\"?><svg width=\"120\" height=\"120\" />"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        validate_diagram(&diagram).expect("expected XML-prefixed SVG payload to be valid");
     }
 
     #[test]
