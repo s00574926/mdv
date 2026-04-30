@@ -1,5 +1,9 @@
 use anyhow::{Context, Result};
-use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher};
+use notify::{
+    Event, RecommendedWatcher, RecursiveMode, Watcher,
+    event::{EventKind, ModifyKind},
+    recommended_watcher,
+};
 use std::{
     path::{Path, PathBuf},
     sync::{
@@ -112,10 +116,11 @@ fn should_refresh_workspace_explorer(event: &Event, watched_root: &Path) -> bool
         return false;
     }
 
-    if event.kind.is_create()
-        || event.kind.is_remove()
-        || event.kind.is_modify() && event.paths.len() > 1
-    {
+    if event.kind.is_create() || event.kind.is_remove() || event.paths.len() > 1 {
+        return true;
+    }
+
+    if matches!(event.kind, EventKind::Modify(ModifyKind::Name(_))) {
         return true;
     }
 
@@ -342,6 +347,20 @@ mod tests {
 
         let event =
             Event::new(EventKind::Remove(RemoveKind::Folder)).add_path(root.join("docs.v1"));
+        assert!(should_refresh_workspace_explorer(&event, &root));
+
+        cleanup_test_dir(&root);
+    }
+
+    #[test]
+    fn single_path_directory_rename_with_dots_refreshes_workspace_explorer() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let root = unique_test_path("workspace");
+        fs::create_dir_all(&root).expect("failed to create root");
+
+        let event =
+            Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::To)))
+                .add_path(root.join("docs.v1"));
         assert!(should_refresh_workspace_explorer(&event, &root));
 
         cleanup_test_dir(&root);
