@@ -157,18 +157,29 @@ fn same_path(candidate: &Path, target: &Path) -> bool {
 fn normalize_path_for_compare(path: &Path) -> PathBuf {
     #[cfg(windows)]
     {
+        const VERBATIM_UNC_PREFIX: &str = r"\\?\UNC\";
+        const VERBATIM_PREFIX: &str = r"\\?\";
+
         let path = path.to_string_lossy();
+        let lower_path = path.to_lowercase();
 
-        if let Some(path) = path.strip_prefix(r"\\?\UNC\") {
-            return PathBuf::from(format!(r"\\{path}"));
+        if lower_path.starts_with(&VERBATIM_UNC_PREFIX.to_lowercase()) {
+            return PathBuf::from(
+                format!(r"\\{}", &path[VERBATIM_UNC_PREFIX.len()..]).to_lowercase(),
+            );
         }
 
-        if let Some(path) = path.strip_prefix(r"\\?\") {
-            return PathBuf::from(path);
+        if lower_path.starts_with(&VERBATIM_PREFIX.to_lowercase()) {
+            return PathBuf::from(path[VERBATIM_PREFIX.len()..].to_lowercase());
         }
+
+        PathBuf::from(lower_path)
     }
 
-    path.to_path_buf()
+    #[cfg(not(windows))]
+    {
+        path.to_path_buf()
+    }
 }
 
 fn begin_refresh_window(refresh_pending: &AtomicBool) -> bool {
@@ -287,13 +298,26 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
+    fn same_path_matches_windows_paths_case_insensitively() {
+        assert!(same_path(
+            Path::new(r"C:\Docs\Plan.md"),
+            Path::new(r"c:\docs\plan.md")
+        ));
+    }
+
+    #[cfg(windows)]
+    #[test]
     fn normalize_path_for_compare_strips_windows_verbatim_prefix() {
         assert_eq!(
             normalize_path_for_compare(Path::new(r"\\?\C:\docs\plan.md")),
-            PathBuf::from(r"C:\docs\plan.md")
+            PathBuf::from(r"c:\docs\plan.md")
         );
         assert_eq!(
             normalize_path_for_compare(Path::new(r"\\?\UNC\server\share\plan.md")),
+            PathBuf::from(r"\\server\share\plan.md")
+        );
+        assert_eq!(
+            normalize_path_for_compare(Path::new(r"\\?\unc\server\share\plan.md")),
             PathBuf::from(r"\\server\share\plan.md")
         );
     }
