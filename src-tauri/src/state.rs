@@ -505,6 +505,11 @@ fn load_recent_paths(path: &Path) -> Vec<PathBuf> {
 }
 
 fn persist_recent_paths(path: &Path, recent_paths: &[PathBuf]) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create {}", parent.display()))?;
+    }
+
     let store = RecentFilesStore {
         recent_paths: recent_paths
             .iter()
@@ -752,7 +757,8 @@ mod tests {
     use super::{
         AppSession, MonitorSnapshot, SavedWindowState, StoredPosition, StoredSize,
         cache_explorer_root, cache_rendered_document, load_recent_paths, load_window_state,
-        persist_saved_window_state, rendered_document_from_cache, resolve_window_position,
+        persist_recent_paths, persist_saved_window_state, rendered_document_from_cache,
+        resolve_window_position,
     };
     use crate::test_support::filesystem_test_lock;
     use crate::{
@@ -949,6 +955,22 @@ mod tests {
 
         fs::remove_file(&path).expect("failed to remove recent files");
         cleanup_test_dir(&path);
+    }
+
+    #[test]
+    fn persist_recent_paths_recreates_missing_parent_directory() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let root = unique_test_path("recent-store-root");
+        let path = root.join("nested").join("recent-files.json");
+        let recent_path = root.join("docs").join("guide.md");
+
+        persist_recent_paths(&path, std::slice::from_ref(&recent_path))
+            .expect("expected recent files persistence to create parent directories");
+
+        let reloaded = load_recent_paths(&path);
+        assert_eq!(reloaded, vec![recent_path]);
+
+        cleanup_test_dir(&root);
     }
 
     #[test]
