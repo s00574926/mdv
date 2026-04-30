@@ -120,11 +120,11 @@ fn should_refresh_workspace_explorer(event: &Event, watched_root: &Path) -> bool
         return true;
     }
 
-    if event.paths.len() > 1 {
-        return true;
+    if matches!(event.kind, EventKind::Modify(ModifyKind::Name(_))) {
+        return should_refresh_for_name_modify(&paths_in_workspace);
     }
 
-    if matches!(event.kind, EventKind::Modify(ModifyKind::Name(_))) {
+    if event.paths.len() > 1 {
         return true;
     }
 
@@ -145,6 +145,16 @@ fn should_refresh_for_create_or_remove(event_kind: &EventKind, paths: &[&PathBuf
             .any(|candidate| path_may_affect_explorer(candidate)),
         _ => false,
     }
+}
+
+fn should_refresh_for_name_modify(paths: &[&PathBuf]) -> bool {
+    if paths.len() <= 1 {
+        return true;
+    }
+
+    paths
+        .iter()
+        .any(|candidate| path_may_affect_explorer(candidate))
 }
 
 fn path_is_within_root(candidate: &Path, watched_root: &Path) -> bool {
@@ -318,6 +328,21 @@ mod tests {
         let remove_event =
             Event::new(EventKind::Remove(RemoveKind::File)).add_path(root.join("notes.txt"));
         assert!(!should_refresh_workspace_explorer(&remove_event, &root));
+
+        cleanup_test_dir(&root);
+    }
+
+    #[test]
+    fn ignores_workspace_explorer_for_non_markdown_file_renames() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let root = unique_test_path("workspace");
+        fs::create_dir_all(&root).expect("failed to create root");
+
+        let event = Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::Both)))
+            .add_path(root.join("notes.txt"))
+            .add_path(root.join("renamed.txt"));
+
+        assert!(!should_refresh_workspace_explorer(&event, &root));
 
         cleanup_test_dir(&root);
     }
