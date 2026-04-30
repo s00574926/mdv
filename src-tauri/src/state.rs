@@ -476,6 +476,10 @@ fn load_recent_paths(path: &Path) -> Vec<PathBuf> {
 
     let mut recent_paths: Vec<PathBuf> = Vec::new();
     for path in store.recent_paths.into_iter().map(PathBuf::from) {
+        if !path.is_absolute() {
+            continue;
+        }
+
         if !path
             .extension()
             .and_then(|value| value.to_str())
@@ -897,25 +901,51 @@ mod tests {
     fn load_recent_paths_dedupes_persisted_entries() {
         let _filesystem_test_lock = filesystem_test_lock();
         let path = unique_test_path("recent-files.json");
+        let recent_dir = path
+            .parent()
+            .expect("recent store path should have a parent");
+        let absolute_plan = recent_dir.join("plan.md");
+        let absolute_notes = recent_dir.join("notes.md");
+        let contents = serde_json::json!({
+            "recent_paths": [
+                absolute_plan.display().to_string(),
+                absolute_plan.display().to_string(),
+                absolute_notes.display().to_string()
+            ]
+        });
 
-        fs::write(
-            &path,
-            r#"{
-  "recent_paths": [
-    "docs/plan.md",
-    "docs/plan.md",
-    "docs/notes.md"
-  ]
-}"#,
-        )
-        .expect("failed to write duplicate recent files");
+        fs::write(&path, contents.to_string()).expect("failed to write duplicate recent files");
 
         let recent_paths = load_recent_paths(&path);
 
-        assert_eq!(
-            recent_paths,
-            vec![PathBuf::from("docs/plan.md"), PathBuf::from("docs/notes.md")]
-        );
+        assert_eq!(recent_paths, vec![absolute_plan, absolute_notes]);
+
+        fs::remove_file(&path).expect("failed to remove recent files");
+        cleanup_test_dir(&path);
+    }
+
+    #[test]
+    fn load_recent_paths_ignores_relative_persisted_entries() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let path = unique_test_path("recent-files.json");
+        let recent_dir = path
+            .parent()
+            .expect("recent store path should have a parent");
+        let absolute_plan = recent_dir.join("plan.md");
+        let absolute_notes = recent_dir.join("notes.md");
+        let contents = serde_json::json!({
+            "recent_paths": [
+                absolute_plan.display().to_string(),
+                "docs/relative.md",
+                absolute_notes.display().to_string()
+            ]
+        });
+
+        fs::write(&path, contents.to_string()).expect("failed to write relative recent files");
+
+        let recent_paths = load_recent_paths(&path);
+
+        assert_eq!(recent_paths, vec![absolute_plan, absolute_notes]);
 
         fs::remove_file(&path).expect("failed to remove recent files");
         cleanup_test_dir(&path);
