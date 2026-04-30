@@ -474,17 +474,30 @@ fn load_recent_paths(path: &Path) -> Vec<PathBuf> {
         return Vec::new();
     };
 
-    store
-        .recent_paths
-        .into_iter()
-        .map(PathBuf::from)
-        .filter(|path| {
-            path.extension()
-                .and_then(|value| value.to_str())
-                .is_some_and(|value| value.eq_ignore_ascii_case("md"))
-        })
-        .take(MAX_RECENT_FILES)
-        .collect()
+    let mut recent_paths: Vec<PathBuf> = Vec::new();
+    for path in store.recent_paths.into_iter().map(PathBuf::from) {
+        if !path
+            .extension()
+            .and_then(|value| value.to_str())
+            .is_some_and(|value| value.eq_ignore_ascii_case("md"))
+        {
+            continue;
+        }
+
+        if recent_paths
+            .iter()
+            .any(|candidate| same_recent_path(candidate, &path))
+        {
+            continue;
+        }
+
+        recent_paths.push(path);
+        if recent_paths.len() >= MAX_RECENT_FILES {
+            break;
+        }
+    }
+
+    recent_paths
 }
 
 fn persist_recent_paths(path: &Path, recent_paths: &[PathBuf]) -> Result<()> {
@@ -729,7 +742,7 @@ fn rects_intersect(
 mod tests {
     use super::{
         AppSession, MonitorSnapshot, SavedWindowState, StoredPosition, StoredSize,
-        cache_explorer_root, cache_rendered_document, load_window_state,
+        cache_explorer_root, cache_rendered_document, load_recent_paths, load_window_state,
         persist_saved_window_state, rendered_document_from_cache, resolve_window_position,
     };
     use crate::test_support::filesystem_test_lock;
@@ -872,6 +885,34 @@ mod tests {
         assert_eq!(reloaded.monitor_index, None);
 
         fs::remove_file(&path).expect("failed to remove legacy window state");
+        cleanup_test_dir(&path);
+    }
+
+    #[test]
+    fn load_recent_paths_dedupes_persisted_entries() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let path = unique_test_path("recent-files.json");
+
+        fs::write(
+            &path,
+            r#"{
+  "recent_paths": [
+    "docs/plan.md",
+    "docs/plan.md",
+    "docs/notes.md"
+  ]
+}"#,
+        )
+        .expect("failed to write duplicate recent files");
+
+        let recent_paths = load_recent_paths(&path);
+
+        assert_eq!(
+            recent_paths,
+            vec![PathBuf::from("docs/plan.md"), PathBuf::from("docs/notes.md")]
+        );
+
+        fs::remove_file(&path).expect("failed to remove recent files");
         cleanup_test_dir(&path);
     }
 
