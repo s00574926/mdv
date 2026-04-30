@@ -23,6 +23,14 @@ runTest("normalizeRecentPath restores UNC paths cleanly", () => {
   );
 });
 
+runTest("normalizeRecentPath handles mixed-case Windows extended prefixes", () => {
+  assert.equal(normalizeRecentPath(String.raw`\\?\c:\docs\plan.md`), String.raw`c:\docs\plan.md`);
+  assert.equal(
+    normalizeRecentPath(String.raw`\\?\unc\server\share\roadmap.md`),
+    String.raw`\\server\share\roadmap.md`
+  );
+});
+
 runTest("recentFileName returns only the filename", () => {
   assert.equal(recentFileName(String.raw`\\?\C:\docs\plan.md`), "plan.md");
   assert.equal(recentFileName("C:/docs/notes.md"), "notes.md");

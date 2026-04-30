@@ -1,10 +1,14 @@
 export function normalizeRecentPath(path: string): string {
-  if (path.startsWith("\\\\?\\UNC\\")) {
-    return `\\\\${path.slice("\\\\?\\UNC\\".length)}`;
+  const windowsExtendedUncPrefix = "\\\\?\\UNC\\";
+  const windowsExtendedPrefix = "\\\\?\\";
+  const lowerPath = path.toLowerCase();
+
+  if (lowerPath.startsWith(windowsExtendedUncPrefix.toLowerCase())) {
+    return `\\\\${path.slice(windowsExtendedUncPrefix.length)}`;
   }
 
-  if (path.startsWith("\\\\?\\")) {
-    return path.slice("\\\\?\\".length);
+  if (lowerPath.startsWith(windowsExtendedPrefix.toLowerCase())) {
+    return path.slice(windowsExtendedPrefix.length);
   }
 
   return path;
