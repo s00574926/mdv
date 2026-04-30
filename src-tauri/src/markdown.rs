@@ -174,11 +174,41 @@ fn looks_like_raw_mermaid_document(markdown: &str) -> bool {
         return false;
     }
 
-    markdown
+    mermaid_detection_body(markdown)
         .lines()
         .map(str::trim)
         .find(|line| !line.is_empty() && !line.starts_with("%%"))
         .is_some_and(is_mermaid_root_line)
+}
+
+fn mermaid_detection_body(markdown: &str) -> &str {
+    let mut frontmatter_start = 0usize;
+
+    for line in markdown.split_inclusive('\n') {
+        let trimmed_line = line.trim_end_matches(&['\r', '\n'][..]).trim();
+        if trimmed_line.is_empty() {
+            frontmatter_start += line.len();
+            continue;
+        }
+
+        if trimmed_line != "---" {
+            return markdown;
+        }
+
+        let mut next_line_start = frontmatter_start + line.len();
+        for frontmatter_line in markdown[next_line_start..].split_inclusive('\n') {
+            let trimmed_frontmatter_line =
+                frontmatter_line.trim_end_matches(&['\r', '\n'][..]).trim();
+            next_line_start += frontmatter_line.len();
+            if trimmed_frontmatter_line == "---" {
+                return &markdown[next_line_start..];
+            }
+        }
+
+        return markdown;
+    }
+
+    markdown
 }
 
 fn is_mermaid_root_line(line: &str) -> bool {
@@ -455,6 +485,25 @@ flowchart TD
         assert!(rendered.html.contains("<pre class=\"mermaid\">"));
         assert!(rendered.html.contains("flowchart TD"));
         assert!(!rendered.html.contains("<p>"));
+    }
+
+    #[test]
+    fn renders_raw_mermaid_documents_with_yaml_frontmatter() {
+        let rendered = untitled_document(
+            "Untitled",
+            r#"---
+title: Release graph
+---
+flowchart TD
+  Start --> Finish
+"#,
+        );
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("title: Release graph"));
+        assert!(rendered.html.contains("flowchart TD"));
+        assert!(!rendered.html.contains("<hr />"));
+        assert!(!rendered.html.contains("<p>flowchart TD"));
     }
 
     #[test]
