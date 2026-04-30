@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use notify::{
     Event, RecommendedWatcher, RecursiveMode, Watcher,
-    event::{EventKind, ModifyKind},
+    event::{CreateKind, EventKind, ModifyKind, RemoveKind},
     recommended_watcher,
 };
 use std::{
@@ -116,7 +116,11 @@ fn should_refresh_workspace_explorer(event: &Event, watched_root: &Path) -> bool
         return false;
     }
 
-    if event.kind.is_create() || event.kind.is_remove() || event.paths.len() > 1 {
+    if should_refresh_for_create_or_remove(&event.kind, &paths_in_workspace) {
+        return true;
+    }
+
+    if event.paths.len() > 1 {
         return true;
     }
 
@@ -130,17 +134,33 @@ fn should_refresh_workspace_explorer(event: &Event, watched_root: &Path) -> bool
             .any(|candidate| path_may_affect_explorer(candidate))
 }
 
+fn should_refresh_for_create_or_remove(event_kind: &EventKind, paths: &[&PathBuf]) -> bool {
+    match event_kind {
+        EventKind::Create(CreateKind::File) | EventKind::Remove(RemoveKind::File) => {
+            paths.iter().any(|candidate| path_is_markdown(candidate))
+        }
+        EventKind::Create(CreateKind::Folder) | EventKind::Remove(RemoveKind::Folder) => true,
+        kind if kind.is_create() || kind.is_remove() => paths
+            .iter()
+            .any(|candidate| path_may_affect_explorer(candidate)),
+        _ => false,
+    }
+}
+
 fn path_is_within_root(candidate: &Path, watched_root: &Path) -> bool {
     let normalized_candidate = normalize_path_for_compare(candidate);
     let normalized_root = normalize_path_for_compare(watched_root);
     normalized_candidate.starts_with(&normalized_root) || same_path(candidate, watched_root)
 }
 
-fn path_may_affect_explorer(path: &Path) -> bool {
+fn path_is_markdown(path: &Path) -> bool {
     path.extension()
         .and_then(|value| value.to_str())
         .is_some_and(|value| value.eq_ignore_ascii_case("md"))
-        || path.extension().is_none()
+}
+
+fn path_may_affect_explorer(path: &Path) -> bool {
+    path_is_markdown(path) || path.extension().is_none()
 }
 
 fn same_path(candidate: &Path, target: &Path) -> bool {
@@ -281,6 +301,23 @@ mod tests {
             .add_path(text_file);
 
         assert!(!should_refresh_workspace_explorer(&event, &root));
+
+        cleanup_test_dir(&root);
+    }
+
+    #[test]
+    fn ignores_workspace_explorer_for_non_markdown_file_create_and_remove() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let root = unique_test_path("workspace");
+        fs::create_dir_all(&root).expect("failed to create root");
+
+        let create_event =
+            Event::new(EventKind::Create(CreateKind::File)).add_path(root.join("notes.txt"));
+        assert!(!should_refresh_workspace_explorer(&create_event, &root));
+
+        let remove_event =
+            Event::new(EventKind::Remove(RemoveKind::File)).add_path(root.join("notes.txt"));
+        assert!(!should_refresh_workspace_explorer(&remove_event, &root));
 
         cleanup_test_dir(&root);
     }
