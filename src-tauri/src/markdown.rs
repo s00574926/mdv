@@ -220,6 +220,10 @@ fn is_mermaid_root_line(line: &str) -> bool {
         return true;
     }
 
+    if is_mermaid_flow_root_line(line, "flowchart-elk") {
+        return true;
+    }
+
     if is_mermaid_pie_root_line(line) {
         return true;
     }
@@ -251,8 +255,11 @@ fn is_mermaid_root_line(line: &str) -> bool {
         "xychart",
         "xychart-beta",
         "radar-beta",
+        "treemap",
         "treemap-beta",
+        "treeView-beta",
         "venn-beta",
+        "wardley-beta",
         "C4Context",
         "C4Container",
         "C4Component",
@@ -578,6 +585,30 @@ gitGraph TB:
         assert!(rendered.html.contains("<pre class=\"mermaid\">"));
         assert!(rendered.html.contains("venn-beta"));
         assert!(!rendered.html.contains("<p>venn-beta"));
+    }
+
+    #[test]
+    fn renders_raw_mermaid_flowchart_elk_documents() {
+        let rendered = untitled_document("Untitled", "flowchart-elk TD\n  A --> B");
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("flowchart-elk TD"));
+        assert!(!rendered.html.contains("<p>flowchart-elk TD"));
+    }
+
+    #[test]
+    fn renders_raw_mermaid_tree_treemap_and_wardley_documents() {
+        for (source, root) in [
+            ("treeView-beta", "treeView-beta"),
+            ("treemap", "treemap"),
+            ("wardley-beta", "wardley-beta"),
+        ] {
+            let rendered = untitled_document("Untitled", source);
+
+            assert!(rendered.html.contains("<pre class=\"mermaid\">"));
+            assert!(rendered.html.contains(root));
+            assert!(!rendered.html.contains(&format!("<p>{root}</p>")));
+        }
     }
 
     #[test]
