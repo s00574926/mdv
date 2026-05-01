@@ -260,7 +260,37 @@ function windowsDisplayPathKey(path: string): string | null {
     return null;
   }
 
-  return normalizedPath.replaceAll("/", "\\").toLowerCase();
+  return collapseWindowsDisplayPathComponents(normalizedPath.replaceAll("/", "\\").toLowerCase());
+}
+
+function collapseWindowsDisplayPathComponents(path: string): string {
+  const parts = path.split("\\");
+  const collapsed: string[] = [];
+  const protectedLength = path.startsWith("\\\\") ? 4 : 1;
+
+  for (const part of parts) {
+    if (part === "" && collapsed.length < 2) {
+      collapsed.push(part);
+      continue;
+    }
+
+    if (part === "" || part === ".") {
+      continue;
+    }
+
+    if (part === "..") {
+      if (collapsed.length > protectedLength) {
+        collapsed.pop();
+      } else {
+        collapsed.push(part);
+      }
+      continue;
+    }
+
+    collapsed.push(part);
+  }
+
+  return collapsed.join("\\");
 }
 
 function escapeHtml(value: string): string {

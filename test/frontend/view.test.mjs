@@ -327,6 +327,8 @@ runTest("sameRecentPaths checks the recent file order", () => {
 runTest("sameDisplayPath normalizes Windows display path variants only", () => {
   assert.equal(sameDisplayPath(String.raw`C:\Docs\Plan.md`, String.raw`\\?\c:\docs\plan.md`), true);
   assert.equal(sameDisplayPath("C:/Docs/Plan.md", String.raw`c:\docs\plan.md`), true);
+  assert.equal(sameDisplayPath(String.raw`C:\Docs\.\Plan.md`, String.raw`c:\docs\plan.md`), true);
+  assert.equal(sameDisplayPath(String.raw`C:\Docs\Drafts\..\Plan.md`, String.raw`c:\docs\plan.md`), true);
   assert.equal(sameDisplayPath("/Docs/Plan.md", "/docs/plan.md"), false);
 });
 
