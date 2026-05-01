@@ -350,6 +350,7 @@ fn tag_end(tag_start: &str) -> Option<usize> {
         match ch {
             '"' | '\'' => quoted_attribute = Some(ch),
             '>' => return Some(index),
+            '<' if index > 0 => return None,
             _ => {}
         }
     }
@@ -592,6 +593,18 @@ mod tests {
         };
 
         let error = validate_diagram(&diagram).expect_err("expected mismatched child rejection");
+        assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
+    }
+
+    #[test]
+    fn rejects_svg_payloads_with_malformed_child_opening_tags() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg width=\"120\" height=\"120\"><g <bad>></g></svg>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        let error = validate_diagram(&diagram).expect_err("expected malformed child rejection");
         assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
     }
 
