@@ -332,8 +332,6 @@ function collapseWindowsDisplayPathComponents(path: string): string {
     if (part === "..") {
       if (collapsed.length > protectedLength) {
         collapsed.pop();
-      } else {
-        collapsed.push(part);
       }
       continue;
     }

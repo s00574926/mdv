@@ -332,6 +332,14 @@ runTest("sameDisplayPath normalizes Windows display path variants only", () => {
   assert.equal(sameDisplayPath("/Docs/Plan.md", "/docs/plan.md"), false);
 });
 
+runTest("sameDisplayPath clamps Windows parent components at roots", () => {
+  assert.equal(sameDisplayPath(String.raw`C:\..\Plan.md`, String.raw`c:\plan.md`), true);
+  assert.equal(
+    sameDisplayPath(String.raw`\\server\share\..\Plan.md`, String.raw`\\server\share\plan.md`),
+    true
+  );
+});
+
 runTest("setTrustedPreviewHtml rejects unexpected trust models", () => {
   const preview = { innerHTML: "" };
 
