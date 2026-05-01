@@ -18,6 +18,7 @@ import {
   renderEditor,
   renderExplorer,
   sameDocumentTabs,
+  sameDisplayPath,
   sameExplorer,
   sameRecentPaths,
   setBusyStateForControls,
@@ -671,7 +672,7 @@ function syncActiveExplorerFile(
   previousFilePath: string | null,
   currentFilePath: string | null
 ): void {
-  if (previousFilePath === currentFilePath) {
+  if (sameDisplayPath(previousFilePath, currentFilePath)) {
     return;
   }
 
@@ -680,9 +681,9 @@ function syncActiveExplorerFile(
   const explorerButtons = elements.explorerTree.querySelectorAll<HTMLButtonElement>("[data-file-path]");
 
   for (const button of explorerButtons) {
-    if (button.dataset.filePath === previousFilePath) {
+    if (sameDisplayPath(button.dataset.filePath, previousFilePath)) {
       previousButton = button;
-    } else if (button.dataset.filePath === currentFilePath) {
+    } else if (sameDisplayPath(button.dataset.filePath, currentFilePath)) {
       currentButton = button;
     }
 

@@ -21,6 +21,7 @@ import {
   renderExplorer,
   renderWorkspaceFrame,
   setBusyStateForControls,
+  sameDisplayPath,
   shouldShowEditorPreview,
   setTrustedPreviewHtml
 } from "../../src/view.ts";
@@ -162,6 +163,27 @@ runTest("renderExplorer marks the active file and escapes file-path attributes",
   assert.match(elements.explorerTree.innerHTML, /data-file-path="C:\/docs\/&lt;draft&gt;&amp;&quot;quote&quot;\.md"/);
 });
 
+runTest("renderExplorer marks active Windows files across case and verbatim path differences", () => {
+  const elements = createElements();
+  const explorer = {
+    name: "docs",
+    path: String.raw`C:\Docs`,
+    children: [
+      {
+        name: "Plan.md",
+        path: String.raw`C:\Docs\Plan.md`,
+        kind: "file",
+        children: []
+      }
+    ]
+  };
+
+  renderExplorer(elements, explorer, String.raw`\\?\c:\docs\plan.md`);
+
+  assert.match(elements.explorerTree.innerHTML, /tree-file-button-active/);
+  assert.match(elements.explorerTree.innerHTML, /aria-current="page"/);
+});
+
 runTest("renderExplorer escapes file and directory names before injecting HTML", () => {
   const elements = createElements();
   const explorer = {
@@ -300,6 +322,12 @@ runTest("sameRecentPaths checks the recent file order", () => {
   assert.equal(sameRecentPaths(["a.md", "b.md"], ["a.md", "b.md"]), true);
   assert.equal(sameRecentPaths(["a.md", "b.md"], ["b.md", "a.md"]), false);
   assert.equal(sameRecentPaths(["a.md"], undefined), false);
+});
+
+runTest("sameDisplayPath normalizes Windows display path variants only", () => {
+  assert.equal(sameDisplayPath(String.raw`C:\Docs\Plan.md`, String.raw`\\?\c:\docs\plan.md`), true);
+  assert.equal(sameDisplayPath("C:/Docs/Plan.md", String.raw`c:\docs\plan.md`), true);
+  assert.equal(sameDisplayPath("/Docs/Plan.md", "/docs/plan.md"), false);
 });
 
 runTest("setTrustedPreviewHtml rejects unexpected trust models", () => {

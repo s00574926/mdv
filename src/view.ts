@@ -227,6 +227,42 @@ export function escapeAttribute(value: string): string {
   return escapeHtml(value).replaceAll("\"", "&quot;");
 }
 
+export function sameDisplayPath(
+  left: string | null | undefined,
+  right: string | null | undefined
+): boolean {
+  if (left === right) {
+    return true;
+  }
+
+  if (!left || !right) {
+    return false;
+  }
+
+  const leftWindowsPath = windowsDisplayPathKey(left);
+  const rightWindowsPath = windowsDisplayPathKey(right);
+  return leftWindowsPath !== null && leftWindowsPath === rightWindowsPath;
+}
+
+function windowsDisplayPathKey(path: string): string | null {
+  const windowsExtendedUncPrefix = "\\\\?\\UNC\\";
+  const windowsExtendedPrefix = "\\\\?\\";
+  const lowerPath = path.toLowerCase();
+  let normalizedPath = path;
+
+  if (lowerPath.startsWith(windowsExtendedUncPrefix.toLowerCase())) {
+    normalizedPath = `\\\\${path.slice(windowsExtendedUncPrefix.length)}`;
+  } else if (lowerPath.startsWith(windowsExtendedPrefix.toLowerCase())) {
+    normalizedPath = path.slice(windowsExtendedPrefix.length);
+  }
+
+  if (!/^[a-z]:[\\/]/i.test(normalizedPath) && !/^[\\/]{2}[^\\/]/.test(normalizedPath)) {
+    return null;
+  }
+
+  return normalizedPath.replaceAll("/", "\\").toLowerCase();
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -245,7 +281,7 @@ export function renderExplorerNode(node: ExplorerNode, currentFilePath: string |
     `;
   }
 
-  const isActive = currentFilePath === node.path;
+  const isActive = sameDisplayPath(currentFilePath, node.path);
   return `
     <button
       type="button"
