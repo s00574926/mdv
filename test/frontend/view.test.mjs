@@ -545,6 +545,23 @@ runTest("shouldShowEditorPreview only enables untitled Mermaid previews", () => 
     ),
     false
   );
+
+  assert.equal(
+    shouldShowEditorPreview(
+      createWorkspace({
+        editorText: "<div class=\"mermaid\">not a diagram</div>",
+        document: {
+          title: "Untitled",
+          html: "<div class=\"mermaid\">not a diagram</div>",
+          sourceName: "",
+          sourcePath: "",
+          watching: false,
+          trustModel: TRUSTED_PREVIEW_TRUST_MODEL
+        }
+      })
+    ),
+    false
+  );
 });
 
 runTest("clearPreview empties the preview region", () => {

@@ -12,6 +12,7 @@ import {
   clearPreview,
   getUnsavedUntitledDocumentIndexes,
   getNextPreviewScale,
+  hasMermaidPreviewBlock,
   hasUnsavedUntitledContent,
   isPreviewZoomShortcut,
   renderDocumentTabs,
@@ -189,7 +190,12 @@ function restorePreviewViewState(viewState: {
 }
 
 async function rerenderThemeSensitivePreview(): Promise<void> {
-  if (!currentWorkspace || elements.preview.hidden || !elements.preview.querySelector(".mermaid")) {
+  if (
+    !currentWorkspace ||
+    elements.preview.hidden ||
+    !hasMermaidPreviewBlock(currentWorkspace.document.html) ||
+    !elements.preview.querySelector("pre.mermaid")
+  ) {
     return;
   }
 
@@ -791,7 +797,7 @@ async function renderPreview(
     elements.preview.hidden = false;
     if (previewMarkupChanged) {
       setTrustedPreviewHtml(elements.preview, workspace.document);
-      if (workspace.document.html.includes('class="mermaid"')) {
+      if (hasMermaidPreviewBlock(workspace.document.html)) {
         await renderMermaid();
       }
       if (previewViewState) {
@@ -815,7 +821,7 @@ async function renderPreview(
   }
 
   setTrustedPreviewHtml(elements.preview, workspace.document);
-  if (workspace.document.html.includes('class="mermaid"')) {
+  if (hasMermaidPreviewBlock(workspace.document.html)) {
     await renderMermaid();
   }
   if (previewViewState) {
@@ -834,7 +840,7 @@ async function syncWindowMaximizeState(): Promise<void> {
 }
 
 async function renderMermaid(): Promise<void> {
-  const nodes = elements.preview.querySelectorAll<HTMLElement>(".mermaid");
+  const nodes = elements.preview.querySelectorAll<HTMLElement>("pre.mermaid");
 
   if (!nodes.length) {
     return;

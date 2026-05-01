@@ -4,6 +4,7 @@ export const MIN_PREVIEW_SCALE = 0.5;
 export const MAX_PREVIEW_SCALE = 2.5;
 
 const PREVIEW_SCALE_STEP = 0.1;
+const MERMAID_PREVIEW_BLOCK = '<pre class="mermaid">';
 const busyControlStates = new WeakMap<BusyControlLike, BusyControlState>();
 const busyEditorStates = new WeakMap<Pick<EditorLike, "readOnly">, BusyEditorState>();
 
@@ -539,8 +540,12 @@ export function renderDocumentTabs(
     .join("");
 }
 
+export function hasMermaidPreviewBlock(html: string): boolean {
+  return html.includes(MERMAID_PREVIEW_BLOCK);
+}
+
 export function shouldShowEditorPreview(workspace: WorkspacePayload): boolean {
-  return workspace.editorText !== null && workspace.document.html.includes('class="mermaid"');
+  return workspace.editorText !== null && hasMermaidPreviewBlock(workspace.document.html);
 }
 
 export function renderWorkspaceFrame(elements: ViewElements, workspace: WorkspacePayload): void {
