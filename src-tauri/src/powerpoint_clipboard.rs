@@ -1,15 +1,18 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 use std::{
     env, fs,
+    io::ErrorKind,
     path::PathBuf,
-    process::Command,
+    process::{self, Command},
+    sync::atomic::{AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 
 const SLIDE_WIDTH_POINTS: f64 = 960.0;
 const SLIDE_HEIGHT_POINTS: f64 = 540.0;
 const SLIDE_MARGIN_POINTS: f64 = 36.0;
+static NEXT_CLIPBOARD_TEMP_DIR_ID: AtomicU64 = AtomicU64::new(0);
 
 const COPY_TO_POWERPOINT_CLIPBOARD_SCRIPT: &str = r#"
 param(
@@ -225,9 +228,9 @@ fn looks_like_svg_document(svg: &str) -> bool {
     let suffix = &document[4..];
     suffix.starts_with("/>")
         || suffix
-        .chars()
-        .next()
-        .is_some_and(|next| next == '>' || next.is_ascii_whitespace())
+            .chars()
+            .next()
+            .is_some_and(|next| next == '>' || next.is_ascii_whitespace())
 }
 
 fn compute_target_bounds(source_width: f64, source_height: f64) -> Result<TargetBounds> {
@@ -259,14 +262,30 @@ struct ClipboardTempDir {
 
 impl ClipboardTempDir {
     fn create() -> Result<Self> {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .context("System clock drifted before the Unix epoch")?
-            .as_millis();
-        let path = env::temp_dir().join(format!("mdv-powerpoint-clipboard-{timestamp}"));
-        fs::create_dir_all(&path)
-            .with_context(|| format!("Failed to create {}", path.display()))?;
-        Ok(Self { path })
+        let temp_root = env::temp_dir();
+
+        for _ in 0..16 {
+            let timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .context("System clock drifted before the Unix epoch")?
+                .as_millis();
+            let sequence = NEXT_CLIPBOARD_TEMP_DIR_ID.fetch_add(1, Ordering::Relaxed);
+            let path = temp_root.join(format!(
+                "mdv-powerpoint-clipboard-{timestamp}-{}-{sequence}",
+                process::id()
+            ));
+
+            match fs::create_dir(&path) {
+                Ok(()) => return Ok(Self { path }),
+                Err(error) if error.kind() == ErrorKind::AlreadyExists => continue,
+                Err(error) => {
+                    return Err(error)
+                        .with_context(|| format!("Failed to create {}", path.display()));
+                }
+            }
+        }
+
+        bail!("Failed to create a unique PowerPoint clipboard temp directory.")
     }
 }
 
@@ -278,7 +297,10 @@ impl Drop for ClipboardTempDir {
 
 #[cfg(test)]
 mod tests {
-    use super::{compute_target_bounds, validate_diagram, MermaidClipboardDiagram};
+    use super::{
+        ClipboardTempDir, MermaidClipboardDiagram, compute_target_bounds, validate_diagram,
+    };
+    use std::collections::HashSet;
 
     #[test]
     fn rejects_invalid_diagram_dimensions() {
@@ -356,6 +378,19 @@ mod tests {
         };
 
         validate_diagram(&diagram).expect("expected XML-prefixed SVG payload to be valid");
+    }
+
+    #[test]
+    fn creates_distinct_temp_directories_for_rapid_exports() {
+        let dirs = (0..64)
+            .map(|_| ClipboardTempDir::create().expect("expected temp dir"))
+            .collect::<Vec<_>>();
+        let unique_paths = dirs
+            .iter()
+            .map(|dir| dir.path.clone())
+            .collect::<HashSet<_>>();
+
+        assert_eq!(unique_paths.len(), dirs.len());
     }
 
     #[test]
