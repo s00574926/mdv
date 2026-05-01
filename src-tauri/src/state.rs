@@ -485,10 +485,12 @@ fn load_recent_paths(path: &Path) -> Vec<PathBuf> {
     };
 
     let mut recent_paths: Vec<PathBuf> = Vec::new();
-    for path in store.recent_paths.into_iter().map(PathBuf::from) {
-        if !path.is_absolute() {
+    for raw_path in store.recent_paths.into_iter().map(PathBuf::from) {
+        if !raw_path.is_absolute() {
             continue;
         }
+
+        let path = normalize_recent_path_components(&raw_path);
 
         if !path
             .extension()
@@ -996,6 +998,46 @@ mod tests {
         let recent_paths = load_recent_paths(&path);
 
         assert_eq!(recent_paths, vec![absolute_plan, absolute_notes]);
+
+        fs::remove_file(&path).expect("failed to remove recent files");
+        cleanup_test_dir(&path);
+    }
+
+    #[test]
+    fn load_recent_paths_normalizes_dot_component_aliases() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let path = unique_test_path("recent-files.json");
+        let recent_dir = path
+            .parent()
+            .expect("recent store path should have a parent");
+        let absolute_plan = recent_dir.join("plan.md");
+        let absolute_plan_alias = format!(r"{}\.\plan.md", recent_dir.display());
+        let absolute_notes = recent_dir.join("notes.md");
+        fs::write(&absolute_plan, "# Plan").expect("failed to write markdown file");
+        let contents = serde_json::json!({
+            "recent_paths": [
+                absolute_plan_alias,
+                absolute_plan.display().to_string(),
+                absolute_notes.display().to_string()
+            ]
+        });
+
+        fs::write(&path, contents.to_string()).expect("failed to write aliased recent files");
+
+        let recent_paths = load_recent_paths(&path);
+        let expected_display_paths = vec![
+            absolute_plan.display().to_string(),
+            absolute_notes.display().to_string(),
+        ];
+
+        assert_eq!(recent_paths, vec![absolute_plan, absolute_notes]);
+        assert_eq!(
+            recent_paths
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>(),
+            expected_display_paths
+        );
 
         fs::remove_file(&path).expect("failed to remove recent files");
         cleanup_test_dir(&path);
