@@ -164,7 +164,11 @@ fn should_refresh_for_name_modify(event_kind: &EventKind, paths: &[&PathBuf]) ->
     matches!(
         event_kind,
         EventKind::Modify(ModifyKind::Name(
-            RenameMode::Any | RenameMode::From | RenameMode::Both | RenameMode::Other
+            RenameMode::Any
+                | RenameMode::From
+                | RenameMode::To
+                | RenameMode::Both
+                | RenameMode::Other
         ))
     ) || !path.exists()
 }
@@ -431,7 +435,7 @@ mod tests {
     }
 
     #[test]
-    fn ignores_workspace_explorer_for_single_non_markdown_rename_to() {
+    fn refreshes_workspace_explorer_for_single_non_markdown_rename_to() {
         let _filesystem_test_lock = filesystem_test_lock();
         let root = unique_test_path("workspace");
         let renamed_text = root.join("renamed.txt");
@@ -441,7 +445,7 @@ mod tests {
         let event = Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::To)))
             .add_path(renamed_text);
 
-        assert!(!should_refresh_workspace_explorer(&event, &root));
+        assert!(should_refresh_workspace_explorer(&event, &root));
 
         cleanup_test_dir(&root);
     }
