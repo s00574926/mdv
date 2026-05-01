@@ -248,10 +248,7 @@ fn looks_like_svg_document(svg: &str) -> bool {
         return suffix[opening_tag.end_index..].trim().is_empty();
     }
 
-    document[4 + opening_tag.end_index..]
-        .trim_end()
-        .to_lowercase()
-        .ends_with("</svg>")
+    svg_root_consumes_document(&document[4 + opening_tag.end_index..])
 }
 
 struct OpeningSvgTag {
@@ -284,6 +281,76 @@ fn parse_opening_svg_tag(suffix: &str) -> Option<OpeningSvgTag> {
     }
 
     None
+}
+
+fn svg_root_consumes_document(body: &str) -> bool {
+    let mut depth = 1usize;
+    let mut cursor = 0usize;
+
+    while let Some(relative_start) = body[cursor..].find('<') {
+        let start = cursor + relative_start;
+        let Some(relative_end) = tag_end(&body[start..]) else {
+            return false;
+        };
+        let end = start + relative_end;
+        let tag = &body[start..=end];
+
+        if svg_tag_is_closing(tag) {
+            depth -= 1;
+            if depth == 0 {
+                return body[end + 1..].trim().is_empty();
+            }
+        } else if svg_tag_is_opening(tag) && !tag_is_self_closing(tag) {
+            depth += 1;
+        }
+
+        cursor = end + 1;
+    }
+
+    false
+}
+
+fn tag_end(tag_start: &str) -> Option<usize> {
+    let mut quoted_attribute = None;
+
+    for (index, ch) in tag_start.char_indices() {
+        if let Some(quote) = quoted_attribute {
+            if ch == quote {
+                quoted_attribute = None;
+            }
+            continue;
+        }
+
+        match ch {
+            '"' | '\'' => quoted_attribute = Some(ch),
+            '>' => return Some(index),
+            _ => {}
+        }
+    }
+
+    None
+}
+
+fn svg_tag_is_closing(tag: &str) -> bool {
+    tag.get(..5)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("</svg"))
+        && tag[5..]
+            .chars()
+            .next()
+            .is_some_and(|ch| ch == '>' || ch.is_ascii_whitespace())
+}
+
+fn svg_tag_is_opening(tag: &str) -> bool {
+    tag.get(..4)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("<svg"))
+        && tag[4..]
+            .chars()
+            .next()
+            .is_some_and(|ch| ch == '>' || ch == '/' || ch.is_ascii_whitespace())
+}
+
+fn tag_is_self_closing(tag: &str) -> bool {
+    tag.trim_end_matches('>').trim_end().ends_with('/')
 }
 
 fn compute_target_bounds(source_width: f64, source_height: f64) -> Result<TargetBounds> {
@@ -448,6 +515,18 @@ mod tests {
     }
 
     #[test]
+    fn rejects_multiple_root_svg_elements() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg width=\"120\" height=\"120\"></svg><svg></svg>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        let error = validate_diagram(&diagram).expect_err("expected multiple root rejection");
+        assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
+    }
+
+    #[test]
     fn accepts_self_closing_svg_clipboard_payloads() {
         let diagram = MermaidClipboardDiagram {
             svg: String::from("<svg/>"),
@@ -467,6 +546,17 @@ mod tests {
         };
 
         validate_diagram(&diagram).expect("expected closed SVG payload to be valid");
+    }
+
+    #[test]
+    fn accepts_nested_svg_elements_inside_the_root() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg width=\"120\" height=\"120\"><svg><g></g></svg></svg>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        validate_diagram(&diagram).expect("expected nested SVG payload to be valid");
     }
 
     #[test]
