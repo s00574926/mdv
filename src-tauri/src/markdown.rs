@@ -279,7 +279,6 @@ fn is_mermaid_root_line(line: &str) -> bool {
         "requirementDiagram",
         "sankey",
         "sankey-beta",
-        "architecture",
         "architecture-beta",
         "block",
         "block-beta",
@@ -712,16 +711,28 @@ gitGraph TB:
     }
 
     #[test]
-    fn renders_raw_mermaid_stable_architecture_documents() {
+    fn renders_raw_mermaid_architecture_beta_documents() {
+        let rendered = untitled_document(
+            "Untitled",
+            r#"architecture-beta
+  service api(server)[API]"#,
+        );
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("architecture-beta"));
+        assert!(!rendered.html.contains("<p>architecture-beta"));
+    }
+
+    #[test]
+    fn leaves_stable_architecture_text_as_markdown() {
         let rendered = untitled_document(
             "Untitled",
             r#"architecture
   service api(server)[API]"#,
         );
 
-        assert!(rendered.html.contains("<pre class=\"mermaid\">"));
-        assert!(rendered.html.contains("architecture"));
-        assert!(!rendered.html.contains("<p>architecture"));
+        assert!(!rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("<p>architecture"));
     }
 
     #[test]
