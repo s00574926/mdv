@@ -172,7 +172,7 @@ fn render_raw_mermaid_document(markdown: &str) -> Option<String> {
 }
 
 fn looks_like_raw_mermaid_document(markdown: &str) -> bool {
-    if markdown.trim().is_empty() || markdown.contains("```") || markdown.contains("~~~") {
+    if markdown.trim().is_empty() || contains_markdown_fence(markdown) {
         return false;
     }
 
@@ -181,6 +181,24 @@ fn looks_like_raw_mermaid_document(markdown: &str) -> bool {
         .map(str::trim)
         .find(|line| !line.is_empty() && !line.starts_with("%%"))
         .is_some_and(is_mermaid_root_line)
+}
+
+fn contains_markdown_fence(markdown: &str) -> bool {
+    markdown.lines().any(|line| {
+        let (indent, content) = split_indentation(line);
+        if indent > 3 {
+            return false;
+        }
+
+        let Some(marker) = content.chars().next() else {
+            return false;
+        };
+        if marker != '`' && marker != '~' {
+            return false;
+        }
+
+        content.chars().take_while(|ch| *ch == marker).count() >= 3
+    })
 }
 
 fn mermaid_detection_body(markdown: &str) -> &str {
@@ -613,6 +631,19 @@ gitGraph TB:
 
         assert!(rendered.html.contains("<pre class=\"mermaid\">flowchart TD"));
         assert!(rendered.html.contains("A[&quot;&lt;pre class=&quot;mermaid&quot;&gt;&quot;] --&gt; B"));
+        assert!(!rendered.html.contains("<p>flowchart TD"));
+    }
+
+    #[test]
+    fn renders_raw_mermaid_documents_with_literal_fence_markers_in_labels() {
+        let rendered = untitled_document(
+            "Untitled",
+            r#"flowchart TD
+  A["```"] --> B"#,
+        );
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">flowchart TD"));
+        assert!(rendered.html.contains("A[&quot;```&quot;] --&gt; B"));
         assert!(!rendered.html.contains("<p>flowchart TD"));
     }
 
