@@ -274,6 +274,8 @@ fn is_mermaid_root_line(line: &str) -> bool {
         "packet",
         "kanban",
         "packet-beta",
+        "ishikawa",
+        "ishikawa-beta",
         "xychart",
         "xychart-beta",
         "radar-beta",
@@ -678,6 +680,21 @@ gitGraph TB:
         assert!(rendered.html.contains("<pre class=\"mermaid\">"));
         assert!(rendered.html.contains("packet"));
         assert!(!rendered.html.contains("<p>packet</p>"));
+    }
+
+    #[test]
+    fn renders_raw_mermaid_ishikawa_documents() {
+        let rendered = untitled_document(
+            "Untitled",
+            r#"ishikawa-beta
+  root((Release delay))
+    cause((Build))
+      issue(Compiler mismatch)"#,
+        );
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("ishikawa-beta"));
+        assert!(!rendered.html.contains("<p>ishikawa-beta"));
     }
 
     #[test]
