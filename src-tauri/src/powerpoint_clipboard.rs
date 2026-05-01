@@ -383,7 +383,7 @@ fn opening_tag_name(tag: &str) -> Option<&str> {
     }
 
     let name_end = tag_name_end(rest)?;
-    if name_end == 0 {
+    if name_end == 0 || !tag_name_separator_is_valid(rest, name_end) {
         return None;
     }
 
@@ -392,8 +392,16 @@ fn opening_tag_name(tag: &str) -> Option<&str> {
 
 fn tag_name_end(tag_body: &str) -> Option<usize> {
     tag_body.char_indices().find_map(|(index, ch)| {
-        (ch == '>' || ch == '/' || ch.is_ascii_whitespace()).then_some(index)
+        (ch == '>' || ch == '/' || ch == '=' || ch == '"' || ch == '\'' || ch.is_ascii_whitespace())
+            .then_some(index)
     })
+}
+
+fn tag_name_separator_is_valid(tag_body: &str, name_end: usize) -> bool {
+    tag_body[name_end..]
+        .chars()
+        .next()
+        .is_some_and(|ch| ch == '>' || ch == '/' || ch.is_ascii_whitespace())
 }
 
 fn tag_is_self_closing(tag: &str) -> bool {
@@ -606,6 +614,18 @@ mod tests {
         };
 
         let error = validate_diagram(&diagram).expect_err("expected malformed child rejection");
+        assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
+    }
+
+    #[test]
+    fn rejects_svg_payloads_with_invalid_child_tag_names() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg width=\"120\" height=\"120\"><g=bad></g=bad></svg>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        let error = validate_diagram(&diagram).expect_err("expected invalid tag name rejection");
         assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
     }
 
