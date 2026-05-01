@@ -5,7 +5,7 @@ use std::{
     collections::HashMap,
     convert::TryFrom,
     fs,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     sync::Mutex,
 };
 use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewWindow, Window};
@@ -536,19 +536,15 @@ fn persist_recent_paths(path: &Path, recent_paths: &[PathBuf]) -> Result<()> {
 }
 
 fn same_recent_path(left: &Path, right: &Path) -> bool {
-    #[cfg(windows)]
-    {
-        recent_path_key(left) == recent_path_key(right)
-    }
+    recent_path_key(left) == recent_path_key(right)
+}
 
-    #[cfg(not(windows))]
-    {
-        left == right
-    }
+fn recent_path_key(path: &Path) -> PathBuf {
+    normalize_recent_path_components(&normalize_recent_platform_path(path))
 }
 
 #[cfg(windows)]
-fn recent_path_key(path: &Path) -> String {
+fn normalize_recent_platform_path(path: &Path) -> PathBuf {
     const VERBATIM_UNC_PREFIX: &str = r"\\?\UNC\";
     const VERBATIM_PREFIX: &str = r"\\?\";
 
@@ -556,21 +552,46 @@ fn recent_path_key(path: &Path) -> String {
     let lower_path = path.to_lowercase();
 
     if lower_path.starts_with(&VERBATIM_UNC_PREFIX.to_lowercase()) {
-        let normalized_unc = format!(r"\\{}", &path[VERBATIM_UNC_PREFIX.len()..]).to_lowercase();
-        return normalize_windows_recent_path_separators(&normalized_unc);
+        return PathBuf::from(normalize_windows_recent_path_separators(
+            &format!(r"\\{}", &path[VERBATIM_UNC_PREFIX.len()..]).to_lowercase(),
+        ));
     }
 
     if lower_path.starts_with(&VERBATIM_PREFIX.to_lowercase()) {
-        let normalized_path = path[VERBATIM_PREFIX.len()..].to_lowercase();
-        return normalize_windows_recent_path_separators(&normalized_path);
+        return PathBuf::from(normalize_windows_recent_path_separators(
+            &path[VERBATIM_PREFIX.len()..].to_lowercase(),
+        ));
     }
 
-    normalize_windows_recent_path_separators(&lower_path)
+    PathBuf::from(normalize_windows_recent_path_separators(&lower_path))
+}
+
+#[cfg(not(windows))]
+fn normalize_recent_platform_path(path: &Path) -> PathBuf {
+    path.to_path_buf()
 }
 
 #[cfg(windows)]
 fn normalize_windows_recent_path_separators(path: &str) -> String {
     path.replace('/', r"\")
+}
+
+fn normalize_recent_path_components(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !normalized.pop() {
+                    normalized.push(component.as_os_str());
+                }
+            }
+            _ => normalized.push(component.as_os_str()),
+        }
+    }
+
+    normalized
 }
 
 fn load_window_state(path: &Path) -> Option<SavedWindowState> {
@@ -937,6 +958,35 @@ mod tests {
             "recent_paths": [
                 absolute_plan.display().to_string(),
                 absolute_plan.display().to_string(),
+                absolute_notes.display().to_string()
+            ]
+        });
+
+        fs::write(&path, contents.to_string()).expect("failed to write duplicate recent files");
+
+        let recent_paths = load_recent_paths(&path);
+
+        assert_eq!(recent_paths, vec![absolute_plan, absolute_notes]);
+
+        fs::remove_file(&path).expect("failed to remove recent files");
+        cleanup_test_dir(&path);
+    }
+
+    #[test]
+    fn load_recent_paths_dedupes_dot_component_aliases() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let path = unique_test_path("recent-files.json");
+        let recent_dir = path
+            .parent()
+            .expect("recent store path should have a parent");
+        let absolute_plan = recent_dir.join("plan.md");
+        let absolute_plan_alias = recent_dir.join(".").join("plan.md");
+        let absolute_notes = recent_dir.join("notes.md");
+        fs::write(&absolute_plan, "# Plan").expect("failed to write markdown file");
+        let contents = serde_json::json!({
+            "recent_paths": [
+                absolute_plan.display().to_string(),
+                absolute_plan_alias.display().to_string(),
                 absolute_notes.display().to_string()
             ]
         });
