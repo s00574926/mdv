@@ -237,6 +237,7 @@ fn is_mermaid_root_line(line: &str) -> bool {
         "erDiagram",
         "journey",
         "gantt",
+        "info",
         "mindmap",
         "timeline",
         "zenuml",
@@ -558,6 +559,15 @@ gitGraph TB:
         assert!(rendered.html.contains("<pre class=\"mermaid\">"));
         assert!(rendered.html.contains("gitGraph TB:"));
         assert!(!rendered.html.contains("<p>gitGraph TB:"));
+    }
+
+    #[test]
+    fn renders_raw_mermaid_info_documents() {
+        let rendered = untitled_document("Untitled", "info");
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("info"));
+        assert!(!rendered.html.contains("<p>info</p>"));
     }
 
     #[test]
