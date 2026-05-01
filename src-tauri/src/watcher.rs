@@ -136,6 +136,9 @@ fn should_refresh_for_create_or_remove(event_kind: &EventKind, paths: &[&PathBuf
             paths.iter().any(|candidate| path_is_markdown(candidate))
         }
         EventKind::Create(CreateKind::Folder) | EventKind::Remove(RemoveKind::Folder) => true,
+        EventKind::Remove(RemoveKind::Any | RemoveKind::Other) => paths
+            .iter()
+            .any(|candidate| path_is_markdown(candidate) || !candidate.exists()),
         kind if kind.is_create() || kind.is_remove() => paths
             .iter()
             .any(|candidate| path_may_affect_explorer(candidate)),
@@ -465,6 +468,18 @@ mod tests {
 
         let event =
             Event::new(EventKind::Remove(RemoveKind::Folder)).add_path(root.join("docs.v1"));
+        assert!(should_refresh_workspace_explorer(&event, &root));
+
+        cleanup_test_dir(&root);
+    }
+
+    #[test]
+    fn imprecise_remove_events_refresh_explorer_for_deleted_dotted_directories() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let root = unique_test_path("workspace");
+        fs::create_dir_all(&root).expect("failed to create root");
+
+        let event = Event::new(EventKind::Remove(RemoveKind::Any)).add_path(root.join("docs.v1"));
         assert!(should_refresh_workspace_explorer(&event, &root));
 
         cleanup_test_dir(&root);
