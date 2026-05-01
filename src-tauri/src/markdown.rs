@@ -249,7 +249,9 @@ fn is_mermaid_root_line(line: &str) -> bool {
         "requirementDiagram",
         "sankey-beta",
         "architecture-beta",
+        "block",
         "block-beta",
+        "packet",
         "kanban",
         "packet-beta",
         "xychart",
@@ -609,6 +611,24 @@ gitGraph TB:
             assert!(rendered.html.contains(root));
             assert!(!rendered.html.contains(&format!("<p>{root}</p>")));
         }
+    }
+
+    #[test]
+    fn renders_raw_mermaid_stable_block_documents() {
+        let rendered = untitled_document("Untitled", "block\n  columns 1\n  A");
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("block"));
+        assert!(!rendered.html.contains("<p>block"));
+    }
+
+    #[test]
+    fn renders_raw_mermaid_stable_packet_documents() {
+        let rendered = untitled_document("Untitled", "packet");
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("packet"));
+        assert!(!rendered.html.contains("<p>packet</p>"));
     }
 
     #[test]
