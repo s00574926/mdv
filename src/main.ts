@@ -30,6 +30,7 @@ import {
   isMacLikePlatform,
   type ShortcutAction
 } from "./shortcuts";
+import { buildDefaultSavePath } from "./save-path";
 import {
   THEME_STORAGE_KEY,
   getMermaidTheme,
@@ -1019,16 +1020,6 @@ function getSuggestedUntitledSaveName(label: string): string {
   const sanitizedLabel = label.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-");
   const baseName = sanitizedLabel.length > 0 ? sanitizedLabel : "Untitled";
   return baseName.toLowerCase().endsWith(".md") ? baseName : `${baseName}.md`;
-}
-
-function buildDefaultSavePath(directory: string | undefined, fileName: string): string {
-  if (!directory) {
-    return fileName;
-  }
-
-  return directory.endsWith("\\") || directory.endsWith("/")
-    ? `${directory}${fileName}`
-    : `${directory}\\${fileName}`;
 }
 
 async function promptToSaveUntitledDocument(

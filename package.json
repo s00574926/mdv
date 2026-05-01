@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1 --port 1420",
     "build": "vite build",
     "test": "npm run test:frontend && cargo test -q --manifest-path src-tauri/Cargo.toml",
-    "test:frontend": "node test/frontend/package.test.mjs && node test/frontend/view.test.mjs && node test/frontend/theme.test.mjs && node test/frontend/recent.test.mjs && node test/frontend/shortcuts.test.mjs",
+    "test:frontend": "node test/frontend/package.test.mjs && node test/frontend/view.test.mjs && node test/frontend/theme.test.mjs && node test/frontend/recent.test.mjs && node test/frontend/shortcuts.test.mjs && node test/frontend/save-path.test.mjs",
     "typecheck": "tsc --noEmit",
     "tauri": "tauri"
   },
