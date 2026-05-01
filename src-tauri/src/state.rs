@@ -1003,6 +1003,7 @@ mod tests {
         cleanup_test_dir(&path);
     }
 
+    #[cfg(windows)]
     #[test]
     fn load_recent_paths_normalizes_dot_component_aliases() {
         let _filesystem_test_lock = filesystem_test_lock();
