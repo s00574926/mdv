@@ -333,6 +333,10 @@ fn xml_markup_end(markup_start: &str) -> Option<usize> {
         return markup_start.find("]]>").map(|index| index + 2);
     }
 
+    if markup_start.starts_with("<?") {
+        return markup_start.find("?>").map(|index| index + 1);
+    }
+
     tag_end(markup_start)
 }
 
@@ -618,6 +622,19 @@ mod tests {
     }
 
     #[test]
+    fn rejects_svg_payloads_with_malformed_processing_instructions() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg width=\"120\" height=\"120\"><?bogus></svg>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        let error =
+            validate_diagram(&diagram).expect_err("expected processing instruction rejection");
+        assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
+    }
+
+    #[test]
     fn accepts_self_closing_svg_clipboard_payloads() {
         let diagram = MermaidClipboardDiagram {
             svg: String::from("<svg/>"),
@@ -661,6 +678,18 @@ mod tests {
         };
 
         validate_diagram(&diagram).expect("expected SVG payload with metadata to be valid");
+    }
+
+    #[test]
+    fn accepts_svg_clipboard_payloads_with_processing_instructions() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg width=\"120\" height=\"120\"><?diagram note?></svg>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        validate_diagram(&diagram)
+            .expect("expected SVG payload with processing instruction to be valid");
     }
 
     #[test]
