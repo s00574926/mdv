@@ -170,7 +170,7 @@ fn path_is_markdown(path: &Path) -> bool {
 }
 
 fn path_may_affect_explorer(path: &Path) -> bool {
-    path_is_markdown(path) || path.extension().is_none()
+    path.is_dir() || path_is_markdown(path) || path.extension().is_none()
 }
 
 fn same_path(candidate: &Path, target: &Path) -> bool {
@@ -423,6 +423,21 @@ mod tests {
         let event =
             Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::To)))
                 .add_path(root.join("docs.v1"));
+        assert!(should_refresh_workspace_explorer(&event, &root));
+
+        cleanup_test_dir(&root);
+    }
+
+    #[test]
+    fn paired_directory_rename_with_dots_refreshes_workspace_explorer() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let root = unique_test_path("workspace");
+        let renamed_directory = root.join("docs.v2");
+        fs::create_dir_all(&renamed_directory).expect("failed to create renamed dir");
+
+        let event = Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::Both)))
+            .add_path(root.join("docs.v1"))
+            .add_path(renamed_directory);
         assert!(should_refresh_workspace_explorer(&event, &root));
 
         cleanup_test_dir(&root);
