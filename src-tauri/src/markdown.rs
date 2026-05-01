@@ -271,6 +271,7 @@ fn is_mermaid_root_line(line: &str) -> bool {
         "zenuml",
         "quadrantChart",
         "requirementDiagram",
+        "sankey",
         "sankey-beta",
         "architecture-beta",
         "block",
@@ -721,6 +722,15 @@ gitGraph TB:
         assert!(rendered.html.contains("<pre class=\"mermaid\">"));
         assert!(rendered.html.contains("packet"));
         assert!(!rendered.html.contains("<p>packet</p>"));
+    }
+
+    #[test]
+    fn renders_raw_mermaid_stable_sankey_documents() {
+        let rendered = untitled_document("Untitled", "sankey\nSource,Target,1");
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("sankey"));
+        assert!(!rendered.html.contains("<p>sankey"));
     }
 
     #[test]
