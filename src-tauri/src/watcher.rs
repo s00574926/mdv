@@ -179,7 +179,7 @@ fn path_is_markdown(path: &Path) -> bool {
 }
 
 fn path_may_affect_explorer(path: &Path) -> bool {
-    path.is_dir() || path_is_markdown(path) || path.extension().is_none()
+    path.is_dir() || path_is_markdown(path) || (!path.exists() && path.extension().is_none())
 }
 
 fn same_path(candidate: &Path, target: &Path) -> bool {
@@ -333,6 +333,22 @@ mod tests {
         let event = Event::new(EventKind::Modify(ModifyKind::Data(DataChange::Content)))
             .add_path(root.join("notes.txt"))
             .add_path(root.join("draft.tmp"));
+
+        assert!(!should_refresh_workspace_explorer(&event, &root));
+
+        cleanup_test_dir(&root);
+    }
+
+    #[test]
+    fn ignores_workspace_explorer_for_extensionless_file_edits() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let root = unique_test_path("workspace");
+        let extensionless_file = root.join("README");
+        fs::create_dir_all(&root).expect("failed to create root");
+        fs::write(&extensionless_file, "ignore").expect("failed to create extensionless file");
+
+        let event = Event::new(EventKind::Modify(ModifyKind::Data(DataChange::Content)))
+            .add_path(extensionless_file);
 
         assert!(!should_refresh_workspace_explorer(&event, &root));
 
