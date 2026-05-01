@@ -552,14 +552,21 @@ fn recent_path_key(path: &Path) -> String {
     let lower_path = path.to_lowercase();
 
     if lower_path.starts_with(&VERBATIM_UNC_PREFIX.to_lowercase()) {
-        return format!(r"\\{}", &path[VERBATIM_UNC_PREFIX.len()..]).to_lowercase();
+        let normalized_unc = format!(r"\\{}", &path[VERBATIM_UNC_PREFIX.len()..]).to_lowercase();
+        return normalize_windows_recent_path_separators(&normalized_unc);
     }
 
     if lower_path.starts_with(&VERBATIM_PREFIX.to_lowercase()) {
-        return path[VERBATIM_PREFIX.len()..].to_lowercase();
+        let normalized_path = path[VERBATIM_PREFIX.len()..].to_lowercase();
+        return normalize_windows_recent_path_separators(&normalized_path);
     }
 
-    lower_path
+    normalize_windows_recent_path_separators(&lower_path)
+}
+
+#[cfg(windows)]
+fn normalize_windows_recent_path_separators(path: &str) -> String {
+    path.replace('/', r"\")
 }
 
 fn load_window_state(path: &Path) -> Option<SavedWindowState> {
@@ -1102,6 +1109,10 @@ mod tests {
     fn recent_path_matching_is_case_insensitive_on_windows() {
         assert!(super::same_recent_path(
             Path::new(r"C:\Docs\Plan.md"),
+            Path::new(r"c:\docs\plan.md")
+        ));
+        assert!(super::same_recent_path(
+            Path::new("C:/Docs/Plan.md"),
             Path::new(r"c:\docs\plan.md")
         ));
         assert!(super::same_recent_path(
