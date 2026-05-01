@@ -5,7 +5,7 @@ use notify::{
     recommended_watcher,
 };
 use std::{
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -211,22 +211,42 @@ fn normalize_path_for_compare(path: &Path) -> PathBuf {
         let lower_path = path.to_lowercase();
 
         if lower_path.starts_with(&VERBATIM_UNC_PREFIX.to_lowercase()) {
-            return PathBuf::from(
-                format!(r"\\{}", &path[VERBATIM_UNC_PREFIX.len()..]).to_lowercase(),
-            );
+            return normalize_dot_components(Path::new(
+                &format!(r"\\{}", &path[VERBATIM_UNC_PREFIX.len()..]).to_lowercase(),
+            ));
         }
 
         if lower_path.starts_with(&VERBATIM_PREFIX.to_lowercase()) {
-            return PathBuf::from(path[VERBATIM_PREFIX.len()..].to_lowercase());
+            return normalize_dot_components(Path::new(
+                &path[VERBATIM_PREFIX.len()..].to_lowercase(),
+            ));
         }
 
-        PathBuf::from(lower_path)
+        normalize_dot_components(Path::new(&lower_path))
     }
 
     #[cfg(not(windows))]
     {
-        path.to_path_buf()
+        normalize_dot_components(path)
     }
+}
+
+fn normalize_dot_components(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !normalized.pop() {
+                    normalized.push(component.as_os_str());
+                }
+            }
+            _ => normalized.push(component.as_os_str()),
+        }
+    }
+
+    normalized
 }
 
 fn begin_refresh_window(refresh_pending: &AtomicBool) -> bool {
@@ -324,6 +344,26 @@ mod tests {
 
         assert!(!should_refresh_workspace_explorer(&event, &root));
 
+        cleanup_test_dir(&root);
+    }
+
+    #[test]
+    fn ignores_workspace_explorer_paths_that_escape_root_with_parent_components() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let root = unique_test_path("workspace");
+        let outside_dir = root.with_file_name("outside-workspace");
+        fs::create_dir_all(&root).expect("failed to create root");
+        fs::create_dir_all(&outside_dir).expect("failed to create outside dir");
+
+        let outside_path = root
+            .join("..")
+            .join(outside_dir.file_name().expect("outside dir should have a name"))
+            .join("outside.md");
+        let event = Event::new(EventKind::Create(CreateKind::File)).add_path(outside_path);
+
+        assert!(!should_refresh_workspace_explorer(&event, &root));
+
+        cleanup_test_dir(&outside_dir);
         cleanup_test_dir(&root);
     }
 
