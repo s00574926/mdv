@@ -284,30 +284,56 @@ fn parse_opening_svg_tag(suffix: &str) -> Option<OpeningSvgTag> {
 }
 
 fn svg_root_consumes_document(body: &str) -> bool {
-    let mut depth = 1usize;
+    let mut stack = vec![String::from("svg")];
     let mut cursor = 0usize;
 
     while let Some(relative_start) = body[cursor..].find('<') {
         let start = cursor + relative_start;
-        let Some(relative_end) = tag_end(&body[start..]) else {
+        let Some(relative_end) = xml_markup_end(&body[start..]) else {
             return false;
         };
         let end = start + relative_end;
         let tag = &body[start..=end];
 
-        if svg_tag_is_closing(tag) {
-            depth -= 1;
-            if depth == 0 {
+        if tag_is_xml_metadata(tag) {
+            cursor = end + 1;
+            continue;
+        }
+
+        if let Some(closing_name) = closing_tag_name(tag) {
+            let Some(opening_name) = stack.pop() else {
+                return false;
+            };
+            if !opening_name.eq_ignore_ascii_case(closing_name) {
+                return false;
+            }
+            if stack.is_empty() {
                 return body[end + 1..].trim().is_empty();
             }
-        } else if svg_tag_is_opening(tag) && !tag_is_self_closing(tag) {
-            depth += 1;
+        } else if let Some(opening_name) = opening_tag_name(tag) {
+            if !tag_is_self_closing(tag) {
+                stack.push(opening_name.to_ascii_lowercase());
+            }
+        } else {
+            return false;
         }
 
         cursor = end + 1;
     }
 
     false
+}
+
+fn xml_markup_end(markup_start: &str) -> Option<usize> {
+    if markup_start.starts_with("<!--") {
+        return markup_start.find("-->").map(|index| index + 2);
+    }
+
+    if markup_start.starts_with("<![CDATA[") {
+        return markup_start.find("]]>").map(|index| index + 2);
+    }
+
+    tag_end(markup_start)
 }
 
 fn tag_end(tag_start: &str) -> Option<usize> {
@@ -331,22 +357,41 @@ fn tag_end(tag_start: &str) -> Option<usize> {
     None
 }
 
-fn svg_tag_is_closing(tag: &str) -> bool {
-    tag.get(..5)
-        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("</svg"))
-        && tag[5..]
-            .chars()
-            .next()
-            .is_some_and(|ch| ch == '>' || ch.is_ascii_whitespace())
+fn tag_is_xml_metadata(tag: &str) -> bool {
+    tag.starts_with("<!--")
+        || tag.starts_with("<![CDATA[")
+        || tag.starts_with("<!")
+        || tag.starts_with("<?")
 }
 
-fn svg_tag_is_opening(tag: &str) -> bool {
-    tag.get(..4)
-        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("<svg"))
-        && tag[4..]
-            .chars()
-            .next()
-            .is_some_and(|ch| ch == '>' || ch == '/' || ch.is_ascii_whitespace())
+fn closing_tag_name(tag: &str) -> Option<&str> {
+    let rest = tag.strip_prefix("</")?;
+    let name_end = tag_name_end(rest)?;
+    if name_end == 0 || rest[name_end..].trim() != ">" {
+        return None;
+    }
+
+    Some(&rest[..name_end])
+}
+
+fn opening_tag_name(tag: &str) -> Option<&str> {
+    let rest = tag.strip_prefix('<')?;
+    if rest.starts_with('/') || rest.starts_with('!') || rest.starts_with('?') {
+        return None;
+    }
+
+    let name_end = tag_name_end(rest)?;
+    if name_end == 0 {
+        return None;
+    }
+
+    Some(&rest[..name_end])
+}
+
+fn tag_name_end(tag_body: &str) -> Option<usize> {
+    tag_body.char_indices().find_map(|(index, ch)| {
+        (ch == '>' || ch == '/' || ch.is_ascii_whitespace()).then_some(index)
+    })
 }
 
 fn tag_is_self_closing(tag: &str) -> bool {
@@ -523,6 +568,30 @@ mod tests {
         };
 
         let error = validate_diagram(&diagram).expect_err("expected multiple root rejection");
+        assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
+    }
+
+    #[test]
+    fn rejects_svg_payloads_with_unclosed_child_elements() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg width=\"120\" height=\"120\"><g></svg>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        let error = validate_diagram(&diagram).expect_err("expected malformed child rejection");
+        assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
+    }
+
+    #[test]
+    fn rejects_svg_payloads_with_mismatched_child_elements() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg width=\"120\" height=\"120\"><g></path></svg>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        let error = validate_diagram(&diagram).expect_err("expected mismatched child rejection");
         assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
     }
 
