@@ -71,3 +71,11 @@ runTest("ubuntu workflow runs the frontend quality gate", () => {
     );
   }
 });
+
+runTest("ubuntu workflow runs the Rust lint gate", () => {
+  assert.match(
+    rustWorkflow,
+    /cargo\s+clippy\s+--manifest-path\s+src-tauri\/Cargo\.toml\s+--all-targets\s+--\s+-D\s+warnings/,
+    "Rust workflow should fail on clippy warnings from the Tauri crate"
+  );
+});
