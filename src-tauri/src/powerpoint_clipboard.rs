@@ -231,16 +231,38 @@ fn looks_like_svg_document(svg: &str) -> bool {
     };
 
     if next == '/' {
-        return suffix.starts_with("/>");
+        return suffix
+            .strip_prefix("/>")
+            .is_some_and(|trailing| trailing.trim().is_empty());
     }
 
-    (next == '>' || next.is_ascii_whitespace()) && opening_svg_tag_is_closed(suffix)
+    if next != '>' && !next.is_ascii_whitespace() {
+        return false;
+    }
+
+    let Some(opening_tag) = parse_opening_svg_tag(suffix) else {
+        return false;
+    };
+
+    if opening_tag.self_closing {
+        return suffix[opening_tag.end_index..].trim().is_empty();
+    }
+
+    document[4 + opening_tag.end_index..]
+        .trim_end()
+        .to_lowercase()
+        .ends_with("</svg>")
 }
 
-fn opening_svg_tag_is_closed(suffix: &str) -> bool {
+struct OpeningSvgTag {
+    end_index: usize,
+    self_closing: bool,
+}
+
+fn parse_opening_svg_tag(suffix: &str) -> Option<OpeningSvgTag> {
     let mut quoted_attribute = None;
 
-    for ch in suffix.chars() {
+    for (index, ch) in suffix.char_indices() {
         if let Some(quote) = quoted_attribute {
             if ch == quote {
                 quoted_attribute = None;
@@ -250,13 +272,18 @@ fn opening_svg_tag_is_closed(suffix: &str) -> bool {
 
         match ch {
             '"' | '\'' => quoted_attribute = Some(ch),
-            '>' => return true,
-            '<' => return false,
+            '>' => {
+                return Some(OpeningSvgTag {
+                    end_index: index + ch.len_utf8(),
+                    self_closing: suffix[..index].trim_end().ends_with('/'),
+                });
+            }
+            '<' => return None,
             _ => {}
         }
     }
 
-    false
+    None
 }
 
 fn compute_target_bounds(source_width: f64, source_height: f64) -> Result<TargetBounds> {
@@ -397,6 +424,30 @@ mod tests {
     }
 
     #[test]
+    fn rejects_svg_payloads_without_a_closing_root_element() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg width=\"120\" height=\"120\"><g>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        let error = validate_diagram(&diagram).expect_err("expected incomplete SVG rejection");
+        assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
+    }
+
+    #[test]
+    fn rejects_svg_payloads_with_trailing_markup_after_the_root_element() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg width=\"120\" height=\"120\"></svg><script></script>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        let error = validate_diagram(&diagram).expect_err("expected trailing markup rejection");
+        assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
+    }
+
+    #[test]
     fn accepts_self_closing_svg_clipboard_payloads() {
         let diagram = MermaidClipboardDiagram {
             svg: String::from("<svg/>"),
@@ -405,6 +456,17 @@ mod tests {
         };
 
         validate_diagram(&diagram).expect("expected self-closing SVG payload to be valid");
+    }
+
+    #[test]
+    fn accepts_closed_svg_clipboard_payloads() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg width=\"120\" height=\"120\"><g></g></svg>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        validate_diagram(&diagram).expect("expected closed SVG payload to be valid");
     }
 
     #[test]
