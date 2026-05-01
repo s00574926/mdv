@@ -252,6 +252,7 @@ fn is_mermaid_root_line(line: &str) -> bool {
         "xychart-beta",
         "radar-beta",
         "treemap-beta",
+        "venn-beta",
         "C4Context",
         "C4Container",
         "C4Component",
@@ -568,6 +569,15 @@ gitGraph TB:
         assert!(rendered.html.contains("<pre class=\"mermaid\">"));
         assert!(rendered.html.contains("info"));
         assert!(!rendered.html.contains("<p>info</p>"));
+    }
+
+    #[test]
+    fn renders_raw_mermaid_venn_documents() {
+        let rendered = untitled_document("Untitled", "venn-beta\nset Bugs");
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("venn-beta"));
+        assert!(!rendered.html.contains("<p>venn-beta"));
     }
 
     #[test]
