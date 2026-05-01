@@ -226,11 +226,37 @@ fn looks_like_svg_document(svg: &str) -> bool {
     }
 
     let suffix = &document[4..];
-    suffix.starts_with("/>")
-        || suffix
-            .chars()
-            .next()
-            .is_some_and(|next| next == '>' || next.is_ascii_whitespace())
+    let Some(next) = suffix.chars().next() else {
+        return false;
+    };
+
+    if next == '/' {
+        return suffix.starts_with("/>");
+    }
+
+    (next == '>' || next.is_ascii_whitespace()) && opening_svg_tag_is_closed(suffix)
+}
+
+fn opening_svg_tag_is_closed(suffix: &str) -> bool {
+    let mut quoted_attribute = None;
+
+    for ch in suffix.chars() {
+        if let Some(quote) = quoted_attribute {
+            if ch == quote {
+                quoted_attribute = None;
+            }
+            continue;
+        }
+
+        match ch {
+            '"' | '\'' => quoted_attribute = Some(ch),
+            '>' => return true,
+            '<' => return false,
+            _ => {}
+        }
+    }
+
+    false
 }
 
 fn compute_target_bounds(source_width: f64, source_height: f64) -> Result<TargetBounds> {
@@ -350,6 +376,18 @@ mod tests {
     fn rejects_svg_prefixes_that_are_not_svg_elements() {
         let diagram = MermaidClipboardDiagram {
             svg: String::from("<svg/onload=alert(1)>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        let error = validate_diagram(&diagram).expect_err("expected malformed SVG rejection");
+        assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
+    }
+
+    #[test]
+    fn rejects_unterminated_svg_opening_tags() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg width=\"120\" height=\"120\""),
             width: 120.0,
             height: 120.0,
         };
