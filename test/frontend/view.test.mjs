@@ -462,9 +462,11 @@ runTest("clearPreview empties the preview region", () => {
   assert.equal(preview.innerHTML, "");
 });
 
-runTest("preview zoom uses ctrl or cmd modified wheel gestures", () => {
-  assert.equal(isPreviewZoomShortcut({ ctrlKey: true, metaKey: false }), true);
-  assert.equal(isPreviewZoomShortcut({ ctrlKey: false, metaKey: true }), true);
+runTest("preview zoom uses the platform primary modifier", () => {
+  assert.equal(isPreviewZoomShortcut({ ctrlKey: true, metaKey: false }, false), true);
+  assert.equal(isPreviewZoomShortcut({ ctrlKey: false, metaKey: true }, false), false);
+  assert.equal(isPreviewZoomShortcut({ ctrlKey: false, metaKey: true }, true), true);
+  assert.equal(isPreviewZoomShortcut({ ctrlKey: true, metaKey: false }, true), false);
   assert.equal(isPreviewZoomShortcut({ ctrlKey: false, metaKey: false }), false);
 });
 

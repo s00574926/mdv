@@ -1222,7 +1222,7 @@ async function handleShortcutAction(action: ShortcutAction): Promise<void> {
 elements.preview.addEventListener(
   "wheel",
   (event: WheelEvent) => {
-    if (!isPreviewZoomShortcut(event)) {
+    if (!isPreviewZoomShortcut(event, isMacLike)) {
       return;
     }
 

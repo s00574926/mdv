@@ -120,8 +120,11 @@ export function renderEditor(
   }
 }
 
-export function isPreviewZoomShortcut(event: Pick<WheelEvent, "ctrlKey" | "metaKey">): boolean {
-  return event.ctrlKey || event.metaKey;
+export function isPreviewZoomShortcut(
+  event: Pick<WheelEvent, "ctrlKey" | "metaKey">,
+  isMacLike = false
+): boolean {
+  return isMacLike ? event.metaKey : event.ctrlKey;
 }
 
 export function clampPreviewScale(scale: number): number {
