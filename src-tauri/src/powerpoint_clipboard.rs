@@ -359,10 +359,7 @@ fn tag_end(tag_start: &str) -> Option<usize> {
 }
 
 fn tag_is_xml_metadata(tag: &str) -> bool {
-    tag.starts_with("<!--")
-        || tag.starts_with("<![CDATA[")
-        || tag.starts_with("<!")
-        || tag.starts_with("<?")
+    tag.starts_with("<!--") || tag.starts_with("<![CDATA[") || tag.starts_with("<?")
 }
 
 fn closing_tag_name(tag: &str) -> Option<&str> {
@@ -609,6 +606,18 @@ mod tests {
     }
 
     #[test]
+    fn rejects_svg_payloads_with_unknown_declarations() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg width=\"120\" height=\"120\"><!bogus></svg>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        let error = validate_diagram(&diagram).expect_err("expected declaration rejection");
+        assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
+    }
+
+    #[test]
     fn accepts_self_closing_svg_clipboard_payloads() {
         let diagram = MermaidClipboardDiagram {
             svg: String::from("<svg/>"),
@@ -639,6 +648,19 @@ mod tests {
         };
 
         validate_diagram(&diagram).expect("expected nested SVG payload to be valid");
+    }
+
+    #[test]
+    fn accepts_svg_clipboard_payloads_with_comments_and_cdata() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from(
+                "<svg width=\"120\" height=\"120\"><!-- label --><style><![CDATA[text { fill: red; }]]></style></svg>",
+            ),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        validate_diagram(&diagram).expect("expected SVG payload with metadata to be valid");
     }
 
     #[test]
