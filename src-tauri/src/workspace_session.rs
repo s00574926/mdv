@@ -196,15 +196,16 @@ pub fn active_document_content(state: &State<'_, AppState>) -> Result<String> {
 
 pub fn snapshot(state: &AppState) -> Result<WorkspaceSnapshot> {
     let session = lock_session(state)?;
-    let active_document = session
+    let active_document_index = session
         .active_document_index
-        .and_then(|index| session.documents.get(index).cloned());
+        .filter(|index| *index < session.documents.len());
+    let active_document =
+        active_document_index.and_then(|index| session.documents.get(index).cloned());
 
     Ok(WorkspaceSnapshot {
         active_document,
-        active_document_index: session.active_document_index,
-        watching: session
-            .active_document_index
+        active_document_index,
+        watching: active_document_index
             .and_then(|index| session.documents.get(index))
             .and_then(|document| document.path.as_ref())
             .is_some()
@@ -539,5 +540,30 @@ mod tests {
 
         assert!(session.documents.is_empty());
         assert_eq!(session.active_document_index, None);
+    }
+
+    #[test]
+    fn snapshot_clears_stale_active_indexes() {
+        let state = crate::state::AppState::new_for_tests();
+        {
+            let mut session = state
+                .session
+                .lock()
+                .expect("state lock should be available");
+            session.documents.push(OpenDocumentSession {
+                path: Some(PathBuf::from(r"C:\docs\first.md")),
+                directory: None,
+                untitled_number: None,
+                content: String::new(),
+            });
+            session.active_document_index = Some(7);
+        }
+
+        let snapshot = super::snapshot(&state).expect("expected workspace snapshot");
+        let tabs = build_document_tabs(&snapshot.document_tabs, snapshot.active_document_index);
+
+        assert_eq!(snapshot.active_document_index, None);
+        assert!(snapshot.active_document.is_none());
+        assert!(tabs.iter().all(|tab| !tab.is_active));
     }
 }
