@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 1420",
     "build": "vite build",
+    "e2e": "playwright test",
+    "e2e:install": "playwright install chromium",
     "test": "npm run test:frontend && cargo test -q --manifest-path src-tauri/Cargo.toml",
     "test:frontend": "node test/frontend/package.test.mjs && node test/frontend/view.test.mjs && node test/frontend/theme.test.mjs && node test/frontend/recent.test.mjs && node test/frontend/shortcuts.test.mjs && node test/frontend/save-path.test.mjs",
     "typecheck": "tsc --noEmit",
@@ -17,6 +19,7 @@
     "mermaid": "^11.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tauri-apps/cli": "^2.0.0",
     "typescript": "^5.9.3",
     "vite": "^7.0.0"

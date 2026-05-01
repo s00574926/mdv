@@ -39,6 +39,10 @@ jobs:
       run: npm run typecheck
     - name: Build frontend
       run: npm run build
+    - name: Install Playwright browser
+      run: npx playwright install --with-deps chromium
+    - name: Run E2E tests
+      run: npm run e2e
     - name: Lint Rust
       run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
     - name: Build

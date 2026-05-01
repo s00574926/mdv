@@ -67,6 +67,16 @@ pub fn open_folder(
 }
 
 #[tauri::command]
+pub fn open_dropped_path(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<WorkspacePayload, String> {
+    let path = PathBuf::from(path);
+    crate::workspace::open_dropped_path(&app, &state, &path).map_err(format_error)
+}
+
+#[tauri::command]
 pub fn open_folder_dialog(
     app: AppHandle,
     state: State<'_, AppState>,

@@ -53,6 +53,7 @@ pub fn run() {
             commands::open_markdown,
             commands::open_markdown_dialog,
             commands::open_folder,
+            commands::open_dropped_path,
             commands::open_folder_dialog,
             commands::open_recent_index,
             commands::select_explorer_file,

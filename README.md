@@ -18,6 +18,7 @@ Use the hamburger menu in the custom title bar to open a Markdown file or folder
 - `Open...` opens a `.md` file in its own tab.
 - `Open Folder...` opens a workspace folder, shows a Markdown-only explorer, and lets you switch files from the sidebar.
 - `Open Recent` reopens previously viewed Markdown files.
+- Relative local image paths render from the opened Markdown file's folder, and relative links to other `.md` files open inside mdv.
 - The current document refreshes automatically when the file changes on disk.
 - When a folder is open, the explorer refreshes for Markdown file and directory changes inside that workspace.
 - In the preview pane, use `Ctrl` + mouse wheel on Windows/Linux or `Cmd` + mouse wheel on macOS to zoom in and out without changing normal scroll behavior.

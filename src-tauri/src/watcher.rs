@@ -410,7 +410,11 @@ mod tests {
 
         let outside_path = root
             .join("..")
-            .join(outside_dir.file_name().expect("outside dir should have a name"))
+            .join(
+                outside_dir
+                    .file_name()
+                    .expect("outside dir should have a name"),
+            )
             .join("outside.md");
         let event = Event::new(EventKind::Create(CreateKind::File)).add_path(outside_path);
 
@@ -491,8 +495,8 @@ mod tests {
         fs::create_dir_all(&root).expect("failed to create root");
         fs::write(&renamed_text, "ignore").expect("failed to create text file");
 
-        let event = Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::To)))
-            .add_path(renamed_text);
+        let event =
+            Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::To))).add_path(renamed_text);
 
         assert!(should_refresh_workspace_explorer(&event, &root));
 
@@ -607,9 +611,8 @@ mod tests {
         let root = unique_test_path("workspace");
         fs::create_dir_all(&root).expect("failed to create root");
 
-        let event =
-            Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::To)))
-                .add_path(root.join("docs.v1"));
+        let event = Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::To)))
+            .add_path(root.join("docs.v1"));
         assert!(should_refresh_workspace_explorer(&event, &root));
 
         cleanup_test_dir(&root);

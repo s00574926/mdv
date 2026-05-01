@@ -78,7 +78,7 @@ runTest("ubuntu rust workflow installs Tauri Linux system dependencies", () => {
 });
 
 runTest("ubuntu workflow runs the frontend quality gate", () => {
-  for (const command of ["npm ci", "npm run typecheck", "npm run build", "npm test"]) {
+  for (const command of ["npm ci", "npm run typecheck", "npm run build", "npm run e2e", "npm test"]) {
     assert.match(
       rustWorkflow,
       new RegExp(command.replaceAll(" ", "\\s+")),

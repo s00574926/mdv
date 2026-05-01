@@ -39,6 +39,10 @@ runTest("getShortcutAction maps standard command shortcuts", () => {
     "close-tab"
   );
   assert.equal(
+    getShortcutAction({ key: "f", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false }, false),
+    "find"
+  );
+  assert.equal(
     getShortcutAction({ key: "s", ctrlKey: false, metaKey: false, altKey: false, shiftKey: false }, false),
     undefined
   );
@@ -61,6 +65,7 @@ runTest("getShortcutAction requires the platform primary modifier", () => {
 
 runTest("getShortcutLabel uses platform-aware primary modifiers", () => {
   assert.equal(getShortcutLabel("save", false), "Ctrl+S");
+  assert.equal(getShortcutLabel("find", false), "Ctrl+F");
   assert.equal(getShortcutLabel("save-as", true), "Cmd+Shift+S");
   assert.equal(getShortcutLabel("next-tab", true), "Ctrl+Tab");
 });

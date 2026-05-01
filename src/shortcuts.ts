@@ -2,6 +2,7 @@ export type ShortcutAction =
   | "new"
   | "open"
   | "open-folder"
+  | "find"
   | "save"
   | "save-as"
   | "close-tab"
@@ -54,6 +55,8 @@ export function getShortcutAction(
   }
 
   switch (key) {
+    case "f":
+      return "find";
     case "n":
       return "new";
     case "o":
@@ -77,6 +80,8 @@ export function getShortcutLabel(action: ShortcutAction, isMacLike: boolean): st
       return `${primaryModifier}+O`;
     case "open-folder":
       return `${primaryModifier}+Shift+O`;
+    case "find":
+      return `${primaryModifier}+F`;
     case "save":
       return `${primaryModifier}+S`;
     case "save-as":

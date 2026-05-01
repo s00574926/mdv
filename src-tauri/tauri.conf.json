@@ -25,6 +25,13 @@
       }
     ],
     "security": {
+      "assetProtocol": {
+        "enable": true,
+        "scope": {
+          "allow": ["$HOME/**", "$DOCUMENT/**", "$DOWNLOAD/**", "$DESKTOP/**", "$PICTURE/**", "$VIDEO/**", "C:\\\\**", "/**"],
+          "requireLiteralLeadingDot": false
+        }
+      },
       "csp": {
         "default-src": "'self'",
         "base-uri": "'none'",

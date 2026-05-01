@@ -103,6 +103,20 @@
         </div>
         <div class="titlebar-controls">
           <button
+            id="titlebar-document-nav"
+            class="titlebar-control-button titlebar-document-nav-button"
+            type="button"
+            aria-label="Show document navigation"
+            aria-controls="document-nav-panel"
+            aria-expanded="false"
+          >
+            <span class="titlebar-document-nav-icon" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </span>
+          </button>
+          <button
             id="titlebar-theme"
             class="titlebar-control-button titlebar-theme-button"
             type="button"
@@ -159,17 +173,62 @@
           <div id="explorer-tree" class="explorer-tree" role="tree"></div>
         </nav>
         <section class="workspace-pane">
-          <section id="editor-panel" class="workspace-editor-panel" hidden>
-            <textarea
-              id="editor"
-              class="workspace-editor"
-              aria-label="Untitled Markdown editor"
-              placeholder="Paste or type Markdown here"
-            ></textarea>
+          <section id="workspace-content" class="workspace-content">
+            <section id="editor-panel" class="workspace-editor-panel" hidden>
+              <textarea
+                id="editor"
+                class="workspace-editor"
+                aria-label="Untitled Markdown editor"
+                placeholder="Paste or type Markdown here"
+              ></textarea>
+            </section>
+            <article id="preview" class="markdown-body" aria-live="polite"></article>
           </section>
-          <article id="preview" class="markdown-body" aria-live="polite"></article>
+          <aside
+            id="document-nav-panel"
+            class="document-nav-panel"
+            aria-label="Document navigation"
+            hidden
+          >
+            <div class="document-find-row">
+              <input
+                id="document-find-input"
+                class="document-find-input"
+                type="search"
+                aria-label="Find in document"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="Find"
+              />
+              <button
+                id="document-find-previous"
+                class="document-nav-icon-button"
+                type="button"
+                aria-label="Previous match"
+              >
+                <span aria-hidden="true">^</span>
+              </button>
+              <button
+                id="document-find-next"
+                class="document-nav-icon-button"
+                type="button"
+                aria-label="Next match"
+              >
+                <span aria-hidden="true">v</span>
+              </button>
+            </div>
+            <div id="document-find-count" class="document-find-count" aria-live="polite"></div>
+            <nav id="document-outline" class="document-outline" aria-label="Table of contents"></nav>
+          </aside>
         </section>
       </main>
+      <div id="drop-overlay" class="drop-overlay" role="status" aria-live="polite" hidden>
+        <div class="drop-overlay-surface">
+          <div class="drop-overlay-icon" aria-hidden="true"></div>
+          <div id="drop-overlay-title" class="drop-overlay-title">Drop to open</div>
+          <div id="drop-overlay-detail" class="drop-overlay-detail">Markdown files or folders</div>
+        </div>
+      </div>
       <div id="preview-context-menu" class="context-menu" role="menu" hidden>
         <button
           id="preview-context-menu-copy-mermaid"

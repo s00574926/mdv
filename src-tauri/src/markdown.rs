@@ -1,9 +1,19 @@
 use anyhow::{Context, Result};
-use comrak::markdown_to_html;
+use comrak::{
+    Arena, format_html,
+    nodes::{AstNode, NodeValue},
+    parse_document,
+};
 use serde::Serialize;
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Component, Path, PathBuf},
+};
 
 use crate::trusted_preview;
+
+const LOCAL_ASSET_URL_PREFIX: &str = "mdv-local-asset:";
+const LOCAL_MARKDOWN_URL_PREFIX: &str = "mdv-local-markdown:";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -26,6 +36,7 @@ pub fn render_file(path: &Path, watching: bool) -> Result<RenderedDocument> {
         &path.display().to_string(),
         &markdown,
         watching,
+        path.parent(),
     ))
 }
 
@@ -62,7 +73,7 @@ pub fn new_document() -> RenderedDocument {
 }
 
 pub fn untitled_document(title: &str, markdown: &str) -> RenderedDocument {
-    render_markdown(title, "", "", markdown, false)
+    render_markdown(title, "", "", markdown, false, None)
 }
 
 pub fn folder_placeholder_document(path: &Path) -> RenderedDocument {
@@ -76,10 +87,17 @@ fn render_markdown(
     source_path: &str,
     markdown: &str,
     watching: bool,
+    base_dir: Option<&Path>,
 ) -> RenderedDocument {
     let markdown = markdown.strip_prefix('\u{feff}').unwrap_or(markdown);
     let transformed = rewrite_mermaid_content(markdown);
-    let html = markdown_to_html(&transformed, &trusted_preview::markdown_options());
+    let options = trusted_preview::markdown_options();
+    let arena = Arena::new();
+    let root = parse_document(&arena, &transformed, &options);
+    rewrite_relative_references(root, base_dir);
+
+    let mut html = String::new();
+    format_html(root, &options, &mut html).expect("formatting HTML into a String should not fail");
 
     RenderedDocument {
         title: title.to_owned(),
@@ -88,6 +106,162 @@ fn render_markdown(
         source_path: source_path.to_owned(),
         watching,
         trust_model: trusted_preview::TRUST_MODEL,
+    }
+}
+
+fn rewrite_relative_references<'a>(root: &'a AstNode<'a>, base_dir: Option<&Path>) {
+    let Some(base_dir) = base_dir else {
+        return;
+    };
+
+    for node in root.descendants() {
+        let mut data = node.data_mut();
+        match data.value {
+            NodeValue::Image(ref mut link) => {
+                if let Some(reference) = resolve_local_reference(base_dir, &link.url) {
+                    link.url = format!(
+                        "{}{}{}",
+                        LOCAL_ASSET_URL_PREFIX,
+                        percent_encode(&reference.path.display().to_string()),
+                        reference.suffix
+                    );
+                }
+            }
+            NodeValue::Link(ref mut link) => {
+                if let Some(reference) = resolve_local_reference(base_dir, &link.url)
+                    && is_markdown_path(&reference.path)
+                {
+                    link.url = format!(
+                        "{}{}{}",
+                        LOCAL_MARKDOWN_URL_PREFIX,
+                        percent_encode(&reference.path.display().to_string()),
+                        reference.suffix
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+struct LocalReference {
+    path: PathBuf,
+    suffix: String,
+}
+
+fn resolve_local_reference(base_dir: &Path, url: &str) -> Option<LocalReference> {
+    if url.is_empty() || url.starts_with('#') || url.starts_with("//") || url_has_scheme(url) {
+        return None;
+    }
+
+    let (path_part, suffix) = split_reference_suffix(url);
+    if path_part.is_empty() {
+        return None;
+    }
+
+    let decoded_path = percent_decode(path_part)?;
+    let candidate = PathBuf::from(decoded_path);
+    let path = if candidate.is_absolute() {
+        candidate
+    } else {
+        base_dir.join(candidate)
+    };
+
+    Some(LocalReference {
+        path: normalize_path_components(&path),
+        suffix: suffix.to_owned(),
+    })
+}
+
+fn split_reference_suffix(url: &str) -> (&str, &str) {
+    let suffix_start = url
+        .char_indices()
+        .find_map(|(index, ch)| (ch == '?' || ch == '#').then_some(index))
+        .unwrap_or(url.len());
+
+    (&url[..suffix_start], &url[suffix_start..])
+}
+
+fn url_has_scheme(url: &str) -> bool {
+    let Some(colon_index) = url.find(':') else {
+        return false;
+    };
+
+    let scheme = &url[..colon_index];
+    if scheme.len() == 1 && url.as_bytes()[0].is_ascii_alphabetic() {
+        return false;
+    }
+
+    scheme
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '+' | '-' | '.'))
+}
+
+fn is_markdown_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("md"))
+}
+
+fn normalize_path_components(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !normalized.pop() && !normalized.has_root() {
+                    normalized.push(component.as_os_str());
+                }
+            }
+            _ => normalized.push(component.as_os_str()),
+        }
+    }
+
+    normalized
+}
+
+fn percent_encode(value: &str) -> String {
+    let mut output = String::new();
+
+    for byte in value.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+            output.push(char::from(byte));
+        } else {
+            output.push_str(&format!("%{byte:02X}"));
+        }
+    }
+
+    output
+}
+
+fn percent_decode(value: &str) -> Option<String> {
+    let bytes = value.as_bytes();
+    let mut output = Vec::with_capacity(bytes.len());
+    let mut index = 0usize;
+
+    while index < bytes.len() {
+        if bytes[index] != b'%' {
+            output.push(bytes[index]);
+            index += 1;
+            continue;
+        }
+
+        let high = hex_value(*bytes.get(index + 1)?)?;
+        let low = hex_value(*bytes.get(index + 2)?)?;
+        output.push((high << 4) | low);
+        index += 3;
+    }
+
+    String::from_utf8(output).ok()
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
     }
 }
 
@@ -470,7 +644,8 @@ fn file_name(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        looks_like_raw_mermaid_document, new_document, render_file, rewrite_mermaid_blocks,
+        LOCAL_ASSET_URL_PREFIX, LOCAL_MARKDOWN_URL_PREFIX, looks_like_raw_mermaid_document,
+        new_document, percent_decode, render_file, render_markdown, rewrite_mermaid_blocks,
         untitled_document,
     };
     use std::{fs, path::PathBuf};
@@ -535,6 +710,62 @@ fn main() {
         assert!(!rewrote_mermaid_block);
         assert!(rewritten.contains("```rust"));
         assert!(!rewritten.contains("<pre class=\"mermaid\">"));
+    }
+
+    #[test]
+    fn rewrites_relative_images_and_markdown_links_to_local_preview_references() {
+        let base_dir = PathBuf::from(r"C:\docs\guide");
+        let rendered = render_markdown(
+            "Guide",
+            "guide.md",
+            r"C:\docs\guide\guide.md",
+            r#"
+![Diagram](assets/diagram%201.png)
+
+[Next](../next.md#intro)
+[Website](https://example.com)
+[Anchor](#local)
+"#,
+            true,
+            Some(&base_dir),
+        );
+
+        let asset_path =
+            extract_prefixed_attribute(&rendered.html, "src=\"", LOCAL_ASSET_URL_PREFIX);
+        assert_eq!(
+            percent_decode(asset_path).expect("expected valid encoded asset path"),
+            r"C:\docs\guide\assets\diagram 1.png"
+        );
+
+        let link_path =
+            extract_prefixed_attribute(&rendered.html, "href=\"", LOCAL_MARKDOWN_URL_PREFIX);
+        let (encoded_path, suffix) = link_path
+            .split_once("#intro")
+            .expect("expected markdown link fragment");
+        assert_eq!(suffix, "");
+        assert_eq!(
+            percent_decode(encoded_path).expect("expected valid encoded markdown path"),
+            r"C:\docs\next.md"
+        );
+
+        assert!(rendered.html.contains("href=\"https://example.com\""));
+        assert!(rendered.html.contains("href=\"#local\""));
+    }
+
+    #[test]
+    fn leaves_relative_non_markdown_links_as_normal_links() {
+        let base_dir = PathBuf::from(r"C:\docs");
+        let rendered = render_markdown(
+            "Guide",
+            "guide.md",
+            r"C:\docs\guide.md",
+            "[PDF](assets/spec.pdf)",
+            true,
+            Some(&base_dir),
+        );
+
+        assert!(rendered.html.contains("href=\"assets/spec.pdf\""));
+        assert!(!rendered.html.contains(LOCAL_MARKDOWN_URL_PREFIX));
     }
 
     #[test]
@@ -679,8 +910,16 @@ gitGraph TB:
   A["<pre class="mermaid">"] --> B"#,
         );
 
-        assert!(rendered.html.contains("<pre class=\"mermaid\">flowchart TD"));
-        assert!(rendered.html.contains("A[&quot;&lt;pre class=&quot;mermaid&quot;&gt;&quot;] --&gt; B"));
+        assert!(
+            rendered
+                .html
+                .contains("<pre class=\"mermaid\">flowchart TD")
+        );
+        assert!(
+            rendered
+                .html
+                .contains("A[&quot;&lt;pre class=&quot;mermaid&quot;&gt;&quot;] --&gt; B")
+        );
         assert!(!rendered.html.contains("<p>flowchart TD"));
     }
 
@@ -692,7 +931,11 @@ gitGraph TB:
   A["```"] --> B"#,
         );
 
-        assert!(rendered.html.contains("<pre class=\"mermaid\">flowchart TD"));
+        assert!(
+            rendered
+                .html
+                .contains("<pre class=\"mermaid\">flowchart TD")
+        );
         assert!(rendered.html.contains("A[&quot;```&quot;] --&gt; B"));
         assert!(!rendered.html.contains("<p>flowchart TD"));
     }
@@ -824,9 +1067,11 @@ gitGraph TB:
                 .html
                 .contains("<p>gitGraph is fun</p>")
         );
-        assert!(!plain_git_graph_sentence
-            .html
-            .contains("<pre class=\"mermaid\">"));
+        assert!(
+            !plain_git_graph_sentence
+                .html
+                .contains("<pre class=\"mermaid\">")
+        );
     }
 
     #[test]
@@ -907,6 +1152,19 @@ gitGraph TB:
 
     fn fixture_path(file_name: &str) -> PathBuf {
         fixtures_dir().join(file_name)
+    }
+
+    fn extract_prefixed_attribute<'a>(html: &'a str, attribute: &str, prefix: &str) -> &'a str {
+        let start = html
+            .find(&format!("{attribute}{prefix}"))
+            .unwrap_or_else(|| panic!("missing {attribute}{prefix} in {html}"))
+            + attribute.len()
+            + prefix.len();
+        let end = html[start..]
+            .find('"')
+            .unwrap_or_else(|| panic!("unterminated attribute in {html}"));
+
+        &html[start..start + end]
     }
 
     fn fixture_expectations() -> &'static [FixtureExpectation] {

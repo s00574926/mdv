@@ -2,6 +2,8 @@ export const TRUSTED_PREVIEW_TRUST_MODEL = "trusted-local-markdown-preview";
 export const DEFAULT_PREVIEW_SCALE = 1;
 export const MIN_PREVIEW_SCALE = 0.5;
 export const MAX_PREVIEW_SCALE = 2.5;
+export const LOCAL_ASSET_URL_PREFIX = "mdv-local-asset:";
+export const LOCAL_MARKDOWN_URL_PREFIX = "mdv-local-markdown:";
 
 const PREVIEW_SCALE_STEP = 0.1;
 const MERMAID_PREVIEW_BLOCK = '<pre class="mermaid">';
@@ -275,8 +277,94 @@ export function setTrustedPreviewHtml(
   preview.innerHTML = documentPayload.html;
 }
 
+export interface LocalPreviewReference {
+  path: string;
+  suffix: string;
+}
+
+export interface DocumentHeading {
+  id: string;
+  level: number;
+  text: string;
+}
+
+export function parseLocalPreviewReference(
+  value: string | null | undefined,
+  prefix: string
+): LocalPreviewReference | null {
+  if (!value?.startsWith(prefix)) {
+    return null;
+  }
+
+  const reference = value.slice(prefix.length);
+  const suffixIndex = findLocalPreviewReferenceSuffixIndex(reference);
+  const encodedPath = reference.slice(0, suffixIndex);
+
+  if (!encodedPath) {
+    return null;
+  }
+
+  try {
+    return {
+      path: decodeURIComponent(encodedPath),
+      suffix: reference.slice(suffixIndex)
+    };
+  } catch {
+    return null;
+  }
+}
+
+function findLocalPreviewReferenceSuffixIndex(reference: string): number {
+  const queryIndex = reference.indexOf("?");
+  const fragmentIndex = reference.indexOf("#");
+  const indexes = [queryIndex, fragmentIndex].filter((index) => index >= 0);
+
+  return indexes.length ? Math.min(...indexes) : reference.length;
+}
+
 export function escapeAttribute(value: string): string {
   return escapeHtml(value).replaceAll("\"", "&quot;");
+}
+
+export function createHeadingId(text: string, usedIds: Set<string>): string {
+  const baseId = text
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "heading";
+  let id = baseId;
+  let suffix = 2;
+
+  while (usedIds.has(id)) {
+    id = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+
+  usedIds.add(id);
+  return id;
+}
+
+export function renderDocumentOutlineItems(headings: DocumentHeading[]): string {
+  if (!headings.length) {
+    return `<div class="document-outline-empty">No headings</div>`;
+  }
+
+  return headings
+    .map(
+      (heading) => `
+        <button
+          type="button"
+          class="document-outline-item document-outline-level-${heading.level}"
+          data-heading-id="${escapeAttribute(heading.id)}"
+          title="${escapeAttribute(heading.text)}"
+        >
+          ${escapeHtml(heading.text)}
+        </button>
+      `
+    )
+    .join("");
 }
 
 export function sameDisplayPath(

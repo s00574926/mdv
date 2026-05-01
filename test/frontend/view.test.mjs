@@ -3,15 +3,19 @@ import assert from "node:assert/strict";
 import {
   clampContextMenuPosition,
   DEFAULT_PREVIEW_SCALE,
+  LOCAL_ASSET_URL_PREFIX,
+  LOCAL_MARKDOWN_URL_PREFIX,
   MAX_PREVIEW_SCALE,
   MIN_PREVIEW_SCALE,
   applyPreviewScale,
   clampPreviewScale,
+  createHeadingId,
   getNextPreviewScale,
   isPreviewZoomShortcut,
   TRUSTED_PREVIEW_TRUST_MODEL,
   clearPreview,
   renderDocumentTabs,
+  renderDocumentOutlineItems,
   renderEditor,
   sameDocumentTabs,
   sameExplorer,
@@ -23,7 +27,8 @@ import {
   setBusyStateForControls,
   sameDisplayPath,
   shouldShowEditorPreview,
-  setTrustedPreviewHtml
+  setTrustedPreviewHtml,
+  parseLocalPreviewReference
 } from "../../src/view.ts";
 
 class FakeClassList {
@@ -306,6 +311,29 @@ runTest("sameDocumentTabs checks label and active state", () => {
   );
 });
 
+runTest("createHeadingId generates stable unique heading ids", () => {
+  const usedIds = new Set(["existing"]);
+
+  assert.equal(createHeadingId("Setup & Plan", usedIds), "setup-plan");
+  assert.equal(createHeadingId("Setup Plan", usedIds), "setup-plan-2");
+  assert.equal(createHeadingId("!!!", usedIds), "heading");
+  assert.equal(createHeadingId("Existing", usedIds), "existing-2");
+});
+
+runTest("renderDocumentOutlineItems renders escaped jump targets", () => {
+  assert.equal(renderDocumentOutlineItems([]), `<div class="document-outline-empty">No headings</div>`);
+
+  const html = renderDocumentOutlineItems([
+    { id: "intro", level: 1, text: "Intro" },
+    { id: "quote", level: 3, text: 'Roadmap <draft> & "quotes"' }
+  ]);
+
+  assert.match(html, /data-heading-id="intro"/);
+  assert.match(html, /document-outline-level-3/);
+  assert.match(html, /Roadmap &lt;draft&gt; &amp; &quot;quotes&quot;/);
+  assert.match(html, /title="Roadmap &lt;draft&gt; &amp; &quot;quotes&quot;"/);
+});
+
 runTest("unsaved untitled helpers only flag non-empty untitled tabs", () => {
   const tabs = [
     { label: "Untitled", isUntitled: true, hasUnsavedContent: true, isActive: true },
@@ -355,6 +383,33 @@ runTest("setTrustedPreviewHtml rejects unexpected trust models", () => {
       }),
     /Unexpected preview trust model/
   );
+});
+
+runTest("parseLocalPreviewReference decodes local asset and markdown references", () => {
+  assert.deepEqual(
+    parseLocalPreviewReference(
+      `${LOCAL_ASSET_URL_PREFIX}C%3A%5CDocs%5CMy%20Image.png#preview`,
+      LOCAL_ASSET_URL_PREFIX
+    ),
+    {
+      path: String.raw`C:\Docs\My Image.png`,
+      suffix: "#preview"
+    }
+  );
+
+  assert.deepEqual(
+    parseLocalPreviewReference(
+      `${LOCAL_MARKDOWN_URL_PREFIX}C%3A%2FDocs%2FGuide.md?raw=1#install`,
+      LOCAL_MARKDOWN_URL_PREFIX
+    ),
+    {
+      path: "C:/Docs/Guide.md",
+      suffix: "?raw=1#install"
+    }
+  );
+
+  assert.equal(parseLocalPreviewReference("https://example.com/image.png", LOCAL_ASSET_URL_PREFIX), null);
+  assert.equal(parseLocalPreviewReference(`${LOCAL_ASSET_URL_PREFIX}%`, LOCAL_ASSET_URL_PREFIX), null);
 });
 
 runTest("renderWorkspaceFrame injects trusted HTML and shows the untitled editor", () => {

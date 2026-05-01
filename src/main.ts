@@ -1,20 +1,25 @@
 import "./styles.css";
 
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { documentDir } from "@tauri-apps/api/path";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow, type DragDropEvent } from "@tauri-apps/api/window";
 import { message, open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import {
   applyPreviewScale,
   clampContextMenuPosition,
   DEFAULT_PREVIEW_SCALE,
+  LOCAL_ASSET_URL_PREFIX,
+  LOCAL_MARKDOWN_URL_PREFIX,
+  createHeadingId,
   clearPreview,
   getUnsavedUntitledDocumentIndexes,
   getNextPreviewScale,
   hasMermaidPreviewBlock,
   hasUnsavedUntitledContent,
   isPreviewZoomShortcut,
+  parseLocalPreviewReference,
+  renderDocumentOutlineItems,
   renderDocumentTabs,
   renderEditor,
   renderExplorer,
@@ -25,6 +30,7 @@ import {
   setBusyStateForControls,
   setTrustedPreviewHtml,
   shouldShowEditorPreview,
+  type DocumentHeading,
   type WorkspacePayload
 } from "./view";
 import {
@@ -47,6 +53,9 @@ import { normalizeRecentPath, recentMenuLabel } from "./recent";
 const WORKSPACE_UPDATED_EVENT = "workspace://updated";
 const EDITOR_PREVIEW_CLASS = "app-root-with-editor-preview";
 const EDITOR_UPDATE_DEBOUNCE_DELAY_MS = 150;
+const FIND_MATCH_CLASS = "document-find-match";
+const FIND_MATCH_ACTIVE_CLASS = "document-find-match-active";
+const FIND_SKIP_SELECTOR = "script, style, textarea, input, button, svg";
 
 type MermaidInstance = (typeof import("mermaid"))["default"];
 type ClipboardItemLike = typeof ClipboardItem;
@@ -58,6 +67,8 @@ interface MermaidPowerPointClipboardPayload {
 type WorkspaceCommand =
   | "new_document"
   | "close_document"
+  | "open_dropped_path"
+  | "open_markdown"
   | "open_folder"
   | "open_markdown_dialog"
   | "open_folder_dialog"
@@ -97,6 +108,15 @@ const elements = {
   appRoot: queryRequired<HTMLElement>("#app-root"),
   documentTabsPanel: queryRequired<HTMLElement>("#document-tabs-panel"),
   documentTabs: queryRequired<HTMLElement>("#document-tabs"),
+  documentNavPanel: queryRequired<HTMLElement>("#document-nav-panel"),
+  documentOutline: queryRequired<HTMLElement>("#document-outline"),
+  documentFindInput: queryRequired<HTMLInputElement>("#document-find-input"),
+  documentFindPrevious: queryRequired<HTMLButtonElement>("#document-find-previous"),
+  documentFindNext: queryRequired<HTMLButtonElement>("#document-find-next"),
+  documentFindCount: queryRequired<HTMLElement>("#document-find-count"),
+  dropOverlay: queryRequired<HTMLElement>("#drop-overlay"),
+  dropOverlayTitle: queryRequired<HTMLElement>("#drop-overlay-title"),
+  dropOverlayDetail: queryRequired<HTMLElement>("#drop-overlay-detail"),
   editorPanel: queryRequired<HTMLElement>("#editor-panel"),
   editor: queryRequired<HTMLTextAreaElement>("#editor"),
   explorerPanel: queryRequired<HTMLElement>("#explorer-panel"),
@@ -116,6 +136,7 @@ const elements = {
   titlebarMenuRecent: queryRequired<HTMLElement>("#titlebar-menu-recent"),
   titlebarMenuSave: queryRequired<HTMLButtonElement>("#titlebar-menu-save"),
   titlebarMenuSaveAs: queryRequired<HTMLButtonElement>("#titlebar-menu-save-as"),
+  titlebarDocumentNav: queryRequired<HTMLButtonElement>("#titlebar-document-nav"),
   titlebarTheme: queryRequired<HTMLButtonElement>("#titlebar-theme"),
   titlebarMinimize: queryRequired<HTMLButtonElement>("#titlebar-minimize"),
   titlebarMaximize: queryRequired<HTMLButtonElement>("#titlebar-maximize"),
@@ -138,6 +159,10 @@ let previewContextMenuTarget: SVGSVGElement | undefined;
 let currentWorkspace: WorkspacePayload | undefined;
 let pendingWindowCloseRequest: Promise<void> | undefined;
 let appExitInProgress = false;
+let documentNavOpen = false;
+let findMatches: HTMLElement[] = [];
+let activeFindMatchIndex = -1;
+let dropOverlayMessageTimeoutId: number | undefined;
 
 async function getMermaid(): Promise<MermaidInstance> {
   if (!mermaidInstancePromise) {
@@ -202,8 +227,10 @@ async function rerenderThemeSensitivePreview(): Promise<void> {
   const viewState = capturePreviewViewState();
   closePreviewContextMenu();
   setTrustedPreviewHtml(elements.preview, currentWorkspace.document);
+  hydrateLocalPreviewAssets();
   await renderMermaid();
   restorePreviewViewState(viewState);
+  syncDocumentNavigation();
 }
 
 async function setAppTheme(theme: AppTheme, options?: { persist?: boolean }): Promise<void> {
@@ -224,11 +251,110 @@ async function setAppTheme(theme: AppTheme, options?: { persist?: boolean }): Pr
 function setBusyState(isBusy: boolean): void {
   setBusyStateForControls(
     document.querySelectorAll<HTMLButtonElement>(
-      ".tree-file-button, .document-tab, .document-tab-close, .titlebar-menu-item, .titlebar-menu-button, .context-menu-item"
+      ".tree-file-button, .document-tab, .document-tab-close, .titlebar-menu-item, .titlebar-menu-button, .titlebar-document-nav-button, .context-menu-item, .document-outline-item, .document-nav-icon-button"
     ),
     elements.editor,
     isBusy
   );
+}
+
+function clearDropOverlayMessageTimeout(): void {
+  if (dropOverlayMessageTimeoutId === undefined) {
+    return;
+  }
+
+  window.clearTimeout(dropOverlayMessageTimeoutId);
+  dropOverlayMessageTimeoutId = undefined;
+}
+
+function setDropOverlayVisible(isVisible: boolean, title = "Drop to open", detail = "Markdown files or folders"): void {
+  clearDropOverlayMessageTimeout();
+  elements.dropOverlayTitle.textContent = title;
+  elements.dropOverlayDetail.textContent = detail;
+  elements.dropOverlay.hidden = !isVisible;
+}
+
+function showTemporaryDropOverlayMessage(title: string, detail: string): void {
+  setDropOverlayVisible(true, title, detail);
+  dropOverlayMessageTimeoutId = window.setTimeout(() => {
+    elements.dropOverlay.hidden = true;
+    dropOverlayMessageTimeoutId = undefined;
+  }, 2400);
+}
+
+function droppedPathDetail(paths: string[]): string {
+  if (paths.length === 1) {
+    const name = paths[0].split(/[\\/]/).filter(Boolean).at(-1) ?? paths[0];
+    return name;
+  }
+
+  return `${paths.length} items`;
+}
+
+async function openDroppedPaths(paths: string[]): Promise<void> {
+  const droppedPaths = paths.filter(Boolean);
+  if (!droppedPaths.length) {
+    return;
+  }
+
+  setDropOverlayVisible(false);
+  let openedCount = 0;
+  for (const path of droppedPaths) {
+    const workspace = await runWorkspaceCommand(
+      "open_dropped_path",
+      { path },
+      { awaitEditorFlush: true }
+    );
+    if (workspace) {
+      openedCount += 1;
+    }
+  }
+
+  if (openedCount === 0) {
+    showTemporaryDropOverlayMessage("Could not open item", "Drop a Markdown file or folder");
+  }
+}
+
+function handleNativeDragDropEvent(event: DragDropEvent): void {
+  switch (event.type) {
+    case "enter":
+      setDropOverlayVisible(true, "Drop to open", droppedPathDetail(event.paths));
+      break;
+    case "over":
+      if (elements.dropOverlay.hidden) {
+        setDropOverlayVisible(true);
+      }
+      break;
+    case "drop":
+      void openDroppedPaths(event.paths);
+      break;
+    case "leave":
+      setDropOverlayVisible(false);
+      break;
+    default:
+      break;
+  }
+}
+
+function getDroppedPathsFromDataTransfer(dataTransfer: DataTransfer | null): string[] {
+  if (!dataTransfer) {
+    return [];
+  }
+
+  const pathList = dataTransfer.getData("application/x-mdv-paths");
+  if (pathList) {
+    try {
+      const parsed = JSON.parse(pathList);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((path): path is string => typeof path === "string" && path.length > 0);
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  const path = dataTransfer.getData("application/x-mdv-path") || dataTransfer.getData("text/plain");
+  return path ? [path] : [];
 }
 
 function setEditorPreviewMode(isEnabled: boolean): void {
@@ -238,6 +364,233 @@ function setEditorPreviewMode(isEnabled: boolean): void {
   }
 
   elements.appRoot.classList.remove(EDITOR_PREVIEW_CLASS);
+}
+
+function setDocumentNavOpen(isOpen: boolean, options?: { focusFind?: boolean }): void {
+  documentNavOpen = isOpen;
+  elements.documentNavPanel.hidden = !isOpen;
+  elements.titlebarDocumentNav.setAttribute("aria-expanded", String(isOpen));
+  elements.titlebarDocumentNav.setAttribute(
+    "aria-label",
+    isOpen ? "Hide document navigation" : "Show document navigation"
+  );
+
+  if (isOpen && options?.focusFind) {
+    elements.documentFindInput.focus();
+    elements.documentFindInput.select();
+  }
+}
+
+function toggleDocumentNav(): void {
+  setDocumentNavOpen(!documentNavOpen);
+}
+
+function focusDocumentFind(): void {
+  setDocumentNavOpen(true, { focusFind: true });
+}
+
+function collectDocumentHeadings(): DocumentHeading[] {
+  if (elements.preview.hidden) {
+    return [];
+  }
+
+  const headingElements = Array.from(
+    elements.preview.querySelectorAll<HTMLHeadingElement>("h1, h2, h3, h4, h5, h6")
+  );
+  const headingElementSet = new Set<Element>(headingElements);
+  const usedIds = new Set<string>();
+
+  elements.preview.querySelectorAll<HTMLElement>("[id]").forEach((element) => {
+    if (!headingElementSet.has(element) && element.id) {
+      usedIds.add(element.id);
+    }
+  });
+
+  return headingElements.reduce<DocumentHeading[]>((headings, heading) => {
+    const text = (heading.textContent ?? "").replace(/\s+/g, " ").trim();
+    if (!text) {
+      return headings;
+    }
+
+    let id = heading.id.trim();
+    if (!id || usedIds.has(id)) {
+      id = createHeadingId(text, usedIds);
+      heading.id = id;
+    } else {
+      usedIds.add(id);
+    }
+
+    headings.push({
+      id,
+      level: Number(heading.tagName.slice(1)),
+      text
+    });
+    return headings;
+  }, []);
+}
+
+function getPreviewElementById(id: string): HTMLElement | null {
+  return Array.from(elements.preview.querySelectorAll<HTMLElement>("[id]")).find(
+    (element) => element.id === id
+  ) ?? null;
+}
+
+function updateActiveOutlineItem(): void {
+  const buttons = elements.documentOutline.querySelectorAll<HTMLButtonElement>("[data-heading-id]");
+  if (!buttons.length || elements.preview.hidden) {
+    return;
+  }
+
+  const previewTop = elements.preview.getBoundingClientRect().top;
+  let activeId = buttons[0].dataset.headingId ?? "";
+  for (const button of buttons) {
+    const headingId = button.dataset.headingId;
+    const heading = headingId ? getPreviewElementById(headingId) : null;
+    if (!heading) {
+      continue;
+    }
+
+    if (heading.getBoundingClientRect().top - previewTop <= 24) {
+      activeId = headingId ?? activeId;
+    } else {
+      break;
+    }
+  }
+
+  buttons.forEach((button) => {
+    button.classList.toggle("document-outline-active", button.dataset.headingId === activeId);
+    button.setAttribute("aria-current", button.dataset.headingId === activeId ? "location" : "false");
+  });
+}
+
+function clearFindHighlights(): void {
+  for (const mark of elements.preview.querySelectorAll<HTMLElement>(`mark.${FIND_MATCH_CLASS}`)) {
+    const parent = mark.parentNode;
+    mark.replaceWith(document.createTextNode(mark.textContent ?? ""));
+    parent?.normalize();
+  }
+
+  findMatches = [];
+  activeFindMatchIndex = -1;
+}
+
+function shouldSearchTextNode(node: Node): number {
+  const parent = node.parentElement;
+  if (!parent || !node.textContent?.trim()) {
+    return NodeFilter.FILTER_REJECT;
+  }
+
+  return parent.closest(FIND_SKIP_SELECTOR) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+}
+
+function markTextNodeMatches(node: Text, query: string, queryLower: string): HTMLElement[] {
+  const text = node.data;
+  const textLower = text.toLowerCase();
+  const fragment = document.createDocumentFragment();
+  const marks: HTMLElement[] = [];
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    const matchIndex = textLower.indexOf(queryLower, cursor);
+    if (matchIndex < 0) {
+      break;
+    }
+
+    if (matchIndex > cursor) {
+      fragment.append(document.createTextNode(text.slice(cursor, matchIndex)));
+    }
+
+    const mark = document.createElement("mark");
+    mark.className = FIND_MATCH_CLASS;
+    mark.textContent = text.slice(matchIndex, matchIndex + query.length);
+    fragment.append(mark);
+    marks.push(mark);
+    cursor = matchIndex + query.length;
+  }
+
+  if (!marks.length) {
+    return [];
+  }
+
+  if (cursor < text.length) {
+    fragment.append(document.createTextNode(text.slice(cursor)));
+  }
+
+  node.replaceWith(fragment);
+  return marks;
+}
+
+function updateFindCount(): void {
+  const query = elements.documentFindInput.value;
+  elements.documentFindPrevious.disabled = !query || findMatches.length === 0;
+  elements.documentFindNext.disabled = !query || findMatches.length === 0;
+
+  if (!query) {
+    elements.documentFindCount.textContent = "";
+    return;
+  }
+
+  elements.documentFindCount.textContent =
+    findMatches.length === 0 ? "0/0" : `${activeFindMatchIndex + 1}/${findMatches.length}`;
+}
+
+function setActiveFindMatch(index: number, options?: { scroll?: boolean }): void {
+  if (!findMatches.length) {
+    activeFindMatchIndex = -1;
+    updateFindCount();
+    return;
+  }
+
+  activeFindMatchIndex = (index + findMatches.length) % findMatches.length;
+  findMatches.forEach((match, matchIndex) => {
+    match.classList.toggle(FIND_MATCH_ACTIVE_CLASS, matchIndex === activeFindMatchIndex);
+  });
+  updateFindCount();
+
+  if (options?.scroll) {
+    findMatches[activeFindMatchIndex]?.scrollIntoView({ block: "center", inline: "nearest" });
+  }
+}
+
+function refreshFindMatches(options?: { preserveIndex?: boolean }): void {
+  const previousIndex = activeFindMatchIndex;
+  clearFindHighlights();
+
+  const query = elements.documentFindInput.value;
+  if (!query || elements.preview.hidden) {
+    updateFindCount();
+    return;
+  }
+
+  const queryLower = query.toLowerCase();
+  const walker = document.createTreeWalker(elements.preview, NodeFilter.SHOW_TEXT, {
+    acceptNode: shouldSearchTextNode
+  });
+  const nodes: Text[] = [];
+
+  while (walker.nextNode()) {
+    nodes.push(walker.currentNode as Text);
+  }
+
+  for (const node of nodes) {
+    findMatches.push(...markTextNodeMatches(node, query, queryLower));
+  }
+
+  setActiveFindMatch(options?.preserveIndex ? Math.max(previousIndex, 0) : 0);
+}
+
+function moveFindMatch(offset: number): void {
+  if (!findMatches.length) {
+    return;
+  }
+
+  setActiveFindMatch(activeFindMatchIndex + offset, { scroll: true });
+}
+
+function syncDocumentNavigation(): void {
+  elements.documentOutline.innerHTML = renderDocumentOutlineItems(collectDocumentHeadings());
+  updateActiveOutlineItem();
+  refreshFindMatches({ preserveIndex: true });
 }
 
 function setTitlebarMenuOpen(isOpen: boolean): void {
@@ -776,6 +1129,46 @@ function shouldRefreshPreviewMarkup(
   );
 }
 
+function hydrateLocalPreviewAssets(): void {
+  for (const element of elements.preview.querySelectorAll<HTMLImageElement | HTMLVideoElement | HTMLAudioElement | HTMLSourceElement>(
+    "img[src], video[src], audio[src], source[src]"
+  )) {
+    const reference = parseLocalPreviewReference(
+      element.getAttribute("src"),
+      LOCAL_ASSET_URL_PREFIX
+    );
+    if (!reference) {
+      continue;
+    }
+
+    element.setAttribute("src", `${convertFileSrc(reference.path)}${reference.suffix}`);
+  }
+}
+
+function getLocalMarkdownPreviewLink(target: EventTarget | null): HTMLAnchorElement | null {
+  if (!(target instanceof Element)) {
+    return null;
+  }
+
+  const link = target.closest("a");
+  if (!(link instanceof HTMLAnchorElement)) {
+    return null;
+  }
+
+  return parseLocalPreviewReference(link.getAttribute("href"), LOCAL_MARKDOWN_URL_PREFIX)
+    ? link
+    : null;
+}
+
+async function openLocalMarkdownPreviewLink(link: HTMLAnchorElement): Promise<void> {
+  const reference = parseLocalPreviewReference(link.getAttribute("href"), LOCAL_MARKDOWN_URL_PREFIX);
+  if (!reference) {
+    return;
+  }
+
+  await runWorkspaceCommand("open_markdown", { path: reference.path }, { awaitEditorFlush: true });
+}
+
 async function renderPreview(
   previousWorkspace: WorkspacePayload | undefined,
   workspace: WorkspacePayload
@@ -791,18 +1184,21 @@ async function renderPreview(
     if (!showEditorPreview) {
       elements.preview.hidden = true;
       clearPreview(elements.preview);
+      syncDocumentNavigation();
       return;
     }
 
     elements.preview.hidden = false;
     if (previewMarkupChanged) {
       setTrustedPreviewHtml(elements.preview, workspace.document);
+      hydrateLocalPreviewAssets();
       if (hasMermaidPreviewBlock(workspace.document.html)) {
         await renderMermaid();
       }
       if (previewViewState) {
         restorePreviewViewState(previewViewState);
       }
+      syncDocumentNavigation();
     }
 
     return;
@@ -813,20 +1209,24 @@ async function renderPreview(
 
   if (!workspace.document.html) {
     clearPreview(elements.preview);
+    syncDocumentNavigation();
     return;
   }
 
   if (!previewMarkupChanged) {
+    syncDocumentNavigation();
     return;
   }
 
   setTrustedPreviewHtml(elements.preview, workspace.document);
+  hydrateLocalPreviewAssets();
   if (hasMermaidPreviewBlock(workspace.document.html)) {
     await renderMermaid();
   }
   if (previewViewState) {
     restorePreviewViewState(previewViewState);
   }
+  syncDocumentNavigation();
 }
 
 async function syncWindowMaximizeState(): Promise<void> {
@@ -1200,6 +1600,9 @@ async function handleShortcutAction(action: ShortcutAction): Promise<void> {
     case "open-folder":
       await handleStaticMenuAction("open-folder");
       break;
+    case "find":
+      focusDocumentFind();
+      break;
     case "save":
       if (currentWorkspace && canSaveActiveUntitledDocument(currentWorkspace)) {
         await handleStaticMenuAction("save");
@@ -1225,6 +1628,16 @@ async function handleShortcutAction(action: ShortcutAction): Promise<void> {
       break;
   }
 }
+
+elements.preview.addEventListener("click", (event: MouseEvent) => {
+  const link = getLocalMarkdownPreviewLink(event.target);
+  if (!link) {
+    return;
+  }
+
+  event.preventDefault();
+  void openLocalMarkdownPreviewLink(link);
+});
 
 elements.preview.addEventListener(
   "wheel",
@@ -1255,6 +1668,50 @@ elements.preview.addEventListener("contextmenu", (event: MouseEvent) => {
 
 elements.preview.addEventListener("scroll", () => {
   closePreviewContextMenu();
+  updateActiveOutlineItem();
+});
+
+elements.titlebarDocumentNav.addEventListener("click", () => {
+  toggleDocumentNav();
+});
+
+elements.documentOutline.addEventListener("click", (event: MouseEvent) => {
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return;
+  }
+
+  const button = target.closest<HTMLButtonElement>("[data-heading-id]");
+  const headingId = button?.dataset.headingId;
+  const heading = headingId ? getPreviewElementById(headingId) : null;
+  if (!button || !heading) {
+    return;
+  }
+
+  heading.scrollIntoView({ block: "start", inline: "nearest" });
+  button.classList.add("document-outline-active");
+  button.setAttribute("aria-current", "location");
+});
+
+elements.documentFindInput.addEventListener("input", () => {
+  refreshFindMatches();
+});
+
+elements.documentFindInput.addEventListener("keydown", (event: KeyboardEvent) => {
+  if (event.key !== "Enter") {
+    return;
+  }
+
+  event.preventDefault();
+  moveFindMatch(event.shiftKey ? -1 : 1);
+});
+
+elements.documentFindPrevious.addEventListener("click", () => {
+  moveFindMatch(-1);
+});
+
+elements.documentFindNext.addEventListener("click", () => {
+  moveFindMatch(1);
 });
 
 elements.explorerTree.addEventListener("click", async (event: MouseEvent) => {
@@ -1509,10 +1966,49 @@ document.addEventListener("contextmenu", (event: MouseEvent) => {
   }
 });
 
+document.addEventListener("dragover", (event: DragEvent) => {
+  event.preventDefault();
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = "copy";
+  }
+});
+
+document.addEventListener("dragenter", (event: DragEvent) => {
+  event.preventDefault();
+  const paths = getDroppedPathsFromDataTransfer(event.dataTransfer);
+  setDropOverlayVisible(true, "Drop to open", paths.length ? droppedPathDetail(paths) : "Markdown files or folders");
+});
+
+document.addEventListener("dragleave", (event: DragEvent) => {
+  if (
+    event.clientX <= 0 ||
+    event.clientY <= 0 ||
+    event.clientX >= window.innerWidth ||
+    event.clientY >= window.innerHeight
+  ) {
+    setDropOverlayVisible(false);
+  }
+});
+
+document.addEventListener("drop", (event: DragEvent) => {
+  event.preventDefault();
+  const paths = getDroppedPathsFromDataTransfer(event.dataTransfer);
+  if (paths.length) {
+    void openDroppedPaths(paths);
+    return;
+  }
+
+  setDropOverlayVisible(false);
+});
+
 document.addEventListener("keydown", (event: KeyboardEvent) => {
   if (event.key === "Escape") {
     closePreviewContextMenu();
     closeTitlebarMenu();
+    setDropOverlayVisible(false);
+    if (documentNavOpen && event.target instanceof Node && elements.documentNavPanel.contains(event.target)) {
+      setDocumentNavOpen(false);
+    }
     return;
   }
 
@@ -1602,6 +2098,10 @@ await currentWindow.onCloseRequested(async (event) => {
   await closeWindowWithPrompt();
 });
 
+await currentWindow.onDragDropEvent((event) => {
+  handleNativeDragDropEvent(event.payload);
+});
+
 await listen<WorkspacePayload>(WORKSPACE_UPDATED_EVENT, async (event) => {
   try {
     await renderWorkspace(event.payload);
@@ -1611,6 +2111,7 @@ await listen<WorkspacePayload>(WORKSPACE_UPDATED_EVENT, async (event) => {
 });
 
 clearPreview(elements.preview);
+syncDocumentNavigation();
 renderRecentMenuItems([]);
 syncMenuShortcutLabels();
 syncThemeToggleButton();

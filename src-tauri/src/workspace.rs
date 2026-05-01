@@ -110,6 +110,18 @@ pub fn open_folder_path(
     Ok(workspace)
 }
 
+pub fn open_dropped_path(
+    app: &AppHandle,
+    state: &State<'_, AppState>,
+    path: &Path,
+) -> Result<WorkspacePayload> {
+    if path.is_dir() {
+        return open_folder_path(app, state, path);
+    }
+
+    open_markdown_path(app, state, path)
+}
+
 pub fn open_folder_dialog(
     app: &AppHandle,
     state: &State<'_, AppState>,
