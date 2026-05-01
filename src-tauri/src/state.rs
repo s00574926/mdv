@@ -134,10 +134,11 @@ impl AppState {
                 .lock()
                 .map_err(|_| anyhow::anyhow!("The preview state is unavailable."))?;
 
+            let path = normalize_recent_store_path(path);
             session
                 .recent_paths
-                .retain(|candidate| !same_recent_path(candidate, path));
-            session.recent_paths.insert(0, path.to_path_buf());
+                .retain(|candidate| !same_recent_path(candidate, &path));
+            session.recent_paths.insert(0, path);
             session.recent_paths.truncate(MAX_RECENT_FILES);
         }
 
@@ -490,7 +491,7 @@ fn load_recent_paths(path: &Path) -> Vec<PathBuf> {
             continue;
         }
 
-        let path = normalize_recent_path_components(&raw_path);
+        let path = normalize_recent_store_path(&raw_path);
 
         if !path
             .extension()
@@ -539,6 +540,34 @@ fn persist_recent_paths(path: &Path, recent_paths: &[PathBuf]) -> Result<()> {
 
 fn same_recent_path(left: &Path, right: &Path) -> bool {
     recent_path_key(left) == recent_path_key(right)
+}
+
+fn normalize_recent_store_path(path: &Path) -> PathBuf {
+    normalize_recent_path_components(&normalize_recent_display_path(path))
+}
+
+#[cfg(windows)]
+fn normalize_recent_display_path(path: &Path) -> PathBuf {
+    const VERBATIM_UNC_PREFIX: &str = r"\\?\UNC\";
+    const VERBATIM_PREFIX: &str = r"\\?\";
+
+    let path = path.to_string_lossy();
+    let lower_path = path.to_lowercase();
+
+    if lower_path.starts_with(&VERBATIM_UNC_PREFIX.to_lowercase()) {
+        return PathBuf::from(format!(r"\\{}", &path[VERBATIM_UNC_PREFIX.len()..]));
+    }
+
+    if lower_path.starts_with(&VERBATIM_PREFIX.to_lowercase()) {
+        return PathBuf::from(&path[VERBATIM_PREFIX.len()..]);
+    }
+
+    PathBuf::from(path.as_ref())
+}
+
+#[cfg(not(windows))]
+fn normalize_recent_display_path(path: &Path) -> PathBuf {
+    path.to_path_buf()
 }
 
 fn recent_path_key(path: &Path) -> PathBuf {
@@ -1039,6 +1068,33 @@ mod tests {
                 .collect::<Vec<_>>(),
             expected_display_paths
         );
+
+        fs::remove_file(&path).expect("failed to remove recent files");
+        cleanup_test_dir(&path);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn load_recent_paths_normalizes_windows_verbatim_entries() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let path = unique_test_path("recent-files.json");
+        let recent_dir = path
+            .parent()
+            .expect("recent store path should have a parent");
+        let absolute_plan = recent_dir.join("plan.md");
+        let verbatim_plan = format!(r"\\?\{}", absolute_plan.display());
+        fs::write(&absolute_plan, "# Plan").expect("failed to write markdown file");
+        let contents = serde_json::json!({
+            "recent_paths": [
+                verbatim_plan
+            ]
+        });
+
+        fs::write(&path, contents.to_string()).expect("failed to write verbatim recent file");
+
+        let recent_paths = load_recent_paths(&path);
+
+        assert_eq!(recent_paths, vec![absolute_plan]);
 
         fs::remove_file(&path).expect("failed to remove recent files");
         cleanup_test_dir(&path);
