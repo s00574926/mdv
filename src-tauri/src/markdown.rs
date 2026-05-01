@@ -252,6 +252,10 @@ fn is_mermaid_root_line(line: &str) -> bool {
         return true;
     }
 
+    if is_mermaid_xychart_root_line(line) {
+        return true;
+    }
+
     const MERMAID_EXACT_ROOTS: &[&str] = &[
         "sequenceDiagram",
         "classDiagram",
@@ -276,8 +280,6 @@ fn is_mermaid_root_line(line: &str) -> bool {
         "packet-beta",
         "ishikawa",
         "ishikawa-beta",
-        "xychart",
-        "xychart-beta",
         "radar-beta",
         "treemap",
         "treemap-beta",
@@ -292,6 +294,11 @@ fn is_mermaid_root_line(line: &str) -> bool {
     ];
 
     MERMAID_EXACT_ROOTS.contains(&line)
+}
+
+fn is_mermaid_xychart_root_line(line: &str) -> bool {
+    is_mermaid_optional_token_root_line(line, "xychart-beta", &["horizontal", "vertical"])
+        || is_mermaid_optional_token_root_line(line, "xychart", &["horizontal", "vertical"])
 }
 
 fn is_mermaid_git_graph_root_line(line: &str) -> bool {
@@ -331,6 +338,25 @@ fn is_mermaid_pie_root_line(line: &str) -> bool {
         .split_whitespace()
         .next()
         .is_some_and(|token| matches!(token, "title" | "showData"))
+}
+
+fn is_mermaid_optional_token_root_line(line: &str, root: &str, tokens: &[&str]) -> bool {
+    let Some(suffix) = line.strip_prefix(root) else {
+        return false;
+    };
+
+    if suffix.is_empty() {
+        return true;
+    }
+
+    if !suffix.chars().next().is_some_and(char::is_whitespace) {
+        return false;
+    }
+
+    suffix
+        .split_whitespace()
+        .next()
+        .is_some_and(|token| tokens.contains(&token.trim_end_matches(';')))
 }
 
 fn is_mermaid_flow_root_line(line: &str, root: &str) -> bool {
@@ -621,6 +647,21 @@ gitGraph TB:
         assert!(rendered.html.contains("<pre class=\"mermaid\">"));
         assert!(rendered.html.contains("flowchart-elk TD"));
         assert!(!rendered.html.contains("<p>flowchart-elk TD"));
+    }
+
+    #[test]
+    fn renders_raw_mermaid_xychart_documents_with_orientation() {
+        let rendered = untitled_document(
+            "Untitled",
+            r#"xychart-beta horizontal
+  title "Q1"
+  x-axis [Jan, Feb]
+  bar [1, 2]"#,
+        );
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("xychart-beta horizontal"));
+        assert!(!rendered.html.contains("<p>xychart-beta horizontal"));
     }
 
     #[test]
