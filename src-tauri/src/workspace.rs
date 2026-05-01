@@ -515,11 +515,15 @@ fn normalize_save_path(mut path: PathBuf) -> Result<PathBuf> {
 
 fn ensure_markdown_file(path: &Path) -> Result<()> {
     let extension = path.extension().and_then(|value| value.to_str());
-    if extension.is_some_and(|value| value.eq_ignore_ascii_case("md")) {
-        return Ok(());
+    if !extension.is_some_and(|value| value.eq_ignore_ascii_case("md")) {
+        bail!("Only .md files can be opened.");
     }
 
-    bail!("Only .md files can be opened.");
+    if path.exists() && !path.is_file() {
+        bail!("Only .md files can be opened.");
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -545,6 +549,20 @@ mod tests {
     fn rejects_non_markdown_paths() {
         let error = ensure_markdown_file(Path::new("notes.txt")).expect_err("expected rejection");
         assert_eq!(error.to_string(), "Only .md files can be opened.");
+    }
+
+    #[test]
+    fn rejects_markdown_named_directories() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let root = unique_test_path("markdown-dir");
+        let path = root.join("archive.md");
+        fs::create_dir_all(&path).expect("failed to create markdown-named directory");
+
+        let error =
+            ensure_markdown_file(&path).expect_err("expected markdown-named directory rejection");
+        assert_eq!(error.to_string(), "Only .md files can be opened.");
+
+        cleanup_test_dir(&root);
     }
 
     #[test]
