@@ -20,6 +20,7 @@ import {
   sameDocumentTabs,
   sameExplorer,
   sameRecentPaths,
+  setBusyStateForControls,
   setTrustedPreviewHtml,
   shouldShowEditorPreview,
   type WorkspacePayload
@@ -214,14 +215,13 @@ async function setAppTheme(theme: AppTheme, options?: { persist?: boolean }): Pr
 }
 
 function setBusyState(isBusy: boolean): void {
-  document
-    .querySelectorAll<HTMLButtonElement>(
+  setBusyStateForControls(
+    document.querySelectorAll<HTMLButtonElement>(
       ".tree-file-button, .document-tab, .document-tab-close, .titlebar-menu-item, .titlebar-menu-button, .context-menu-item"
-    )
-    .forEach((button) => {
-      button.disabled = isBusy;
-    });
-  elements.editor.readOnly = isBusy;
+    ),
+    elements.editor,
+    isBusy
+  );
 }
 
 function setEditorPreviewMode(isEnabled: boolean): void {

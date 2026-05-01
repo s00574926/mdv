@@ -20,6 +20,7 @@ import {
   getUnsavedUntitledDocumentIndexes,
   renderExplorer,
   renderWorkspaceFrame,
+  setBusyStateForControls,
   shouldShowEditorPreview,
   setTrustedPreviewHtml
 } from "../../src/view.ts";
@@ -401,6 +402,26 @@ runTest("renderEditor only updates the text area when needed", () => {
   renderEditor(elements, null);
   assert.equal(elements.editorPanel.hidden, true);
   assert.equal(elements.editor.value, "");
+});
+
+runTest("setBusyStateForControls restores controls that were disabled before busy state", () => {
+  const enabledButton = { disabled: false, dataset: {} };
+  const disabledButton = { disabled: true, dataset: {} };
+  const untrackedDisabledButton = { disabled: true, dataset: {} };
+  const editor = { value: "", readOnly: false };
+
+  setBusyStateForControls([enabledButton, disabledButton], editor, true);
+
+  assert.equal(enabledButton.disabled, true);
+  assert.equal(disabledButton.disabled, true);
+  assert.equal(editor.readOnly, true);
+
+  setBusyStateForControls([enabledButton, disabledButton, untrackedDisabledButton], editor, false);
+
+  assert.equal(enabledButton.disabled, false);
+  assert.equal(disabledButton.disabled, true);
+  assert.equal(untrackedDisabledButton.disabled, true);
+  assert.equal(editor.readOnly, false);
 });
 
 runTest("shouldShowEditorPreview only enables untitled Mermaid previews", () => {

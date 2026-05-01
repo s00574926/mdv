@@ -85,6 +85,13 @@ interface EditorLike {
   readOnly?: boolean;
 }
 
+interface BusyControlLike {
+  disabled: boolean;
+  dataset?: {
+    busyPreviousDisabled?: string;
+  };
+}
+
 export interface ViewElements {
   appRoot: {
     classList: ClassListLike;
@@ -118,6 +125,31 @@ export function renderEditor(
   if (elements.editor.value !== editorText) {
     elements.editor.value = editorText;
   }
+}
+
+export function setBusyStateForControls(
+  controls: Iterable<BusyControlLike>,
+  editor: Pick<EditorLike, "readOnly">,
+  isBusy: boolean
+): void {
+  for (const control of controls) {
+    if (isBusy) {
+      if (control.dataset && control.dataset.busyPreviousDisabled === undefined) {
+        control.dataset.busyPreviousDisabled = String(control.disabled);
+      }
+      control.disabled = true;
+      continue;
+    }
+
+    if (control.dataset?.busyPreviousDisabled === undefined) {
+      continue;
+    }
+
+    control.disabled = control.dataset.busyPreviousDisabled === "true";
+    delete control.dataset.busyPreviousDisabled;
+  }
+
+  editor.readOnly = isBusy;
 }
 
 export function isPreviewZoomShortcut(
