@@ -124,10 +124,6 @@ fn should_refresh_workspace_explorer(event: &Event, watched_root: &Path) -> bool
         return should_refresh_for_name_modify(&paths_in_workspace);
     }
 
-    if event.paths.len() > 1 {
-        return true;
-    }
-
     event.kind.is_modify()
         && paths_in_workspace
             .iter()
@@ -309,6 +305,21 @@ mod tests {
 
         let event = Event::new(EventKind::Modify(ModifyKind::Data(DataChange::Content)))
             .add_path(text_file);
+
+        assert!(!should_refresh_workspace_explorer(&event, &root));
+
+        cleanup_test_dir(&root);
+    }
+
+    #[test]
+    fn ignores_workspace_explorer_for_multiple_non_markdown_file_edits() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let root = unique_test_path("workspace");
+        fs::create_dir_all(&root).expect("failed to create root");
+
+        let event = Event::new(EventKind::Modify(ModifyKind::Data(DataChange::Content)))
+            .add_path(root.join("notes.txt"))
+            .add_path(root.join("draft.tmp"));
 
         assert!(!should_refresh_workspace_explorer(&event, &root));
 
