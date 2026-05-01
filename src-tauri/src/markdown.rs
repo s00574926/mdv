@@ -176,11 +176,17 @@ fn looks_like_raw_mermaid_document(markdown: &str) -> bool {
         return false;
     }
 
-    mermaid_detection_body(markdown)
-        .lines()
-        .map(str::trim)
-        .find(|line| !line.is_empty() && !line.starts_with("%%"))
-        .is_some_and(is_mermaid_root_line)
+    for line in mermaid_detection_body(markdown).lines() {
+        let (indent, content) = split_indentation(line);
+        let line = content.trim();
+        if line.is_empty() || line.starts_with("%%") {
+            continue;
+        }
+
+        return indent <= 3 && is_mermaid_root_line(line);
+    }
+
+    false
 }
 
 fn contains_markdown_fence(markdown: &str) -> bool {
@@ -689,6 +695,19 @@ gitGraph TB:
         assert!(rendered.html.contains("<pre class=\"mermaid\">flowchart TD"));
         assert!(rendered.html.contains("A[&quot;```&quot;] --&gt; B"));
         assert!(!rendered.html.contains("<p>flowchart TD"));
+    }
+
+    #[test]
+    fn leaves_indented_raw_mermaid_documents_as_code_blocks() {
+        let rendered = untitled_document(
+            "Untitled",
+            r#"    flowchart TD
+      A --> B"#,
+        );
+
+        assert!(!rendered.html.contains("<pre class=\"mermaid\">"));
+        assert!(rendered.html.contains("<pre><code>flowchart TD"));
+        assert!(rendered.html.contains("A --&gt; B"));
     }
 
     #[test]
