@@ -4,6 +4,7 @@ export const MIN_PREVIEW_SCALE = 0.5;
 export const MAX_PREVIEW_SCALE = 2.5;
 
 const PREVIEW_SCALE_STEP = 0.1;
+const busyPreviousEditorReadOnly = new WeakMap<Pick<EditorLike, "readOnly">, boolean>();
 
 export interface RenderedDocument {
   title: string;
@@ -149,7 +150,18 @@ export function setBusyStateForControls(
     delete control.dataset.busyPreviousDisabled;
   }
 
-  editor.readOnly = isBusy;
+  if (isBusy) {
+    if (!busyPreviousEditorReadOnly.has(editor)) {
+      busyPreviousEditorReadOnly.set(editor, Boolean(editor.readOnly));
+    }
+    editor.readOnly = true;
+    return;
+  }
+
+  if (busyPreviousEditorReadOnly.has(editor)) {
+    editor.readOnly = busyPreviousEditorReadOnly.get(editor) ?? false;
+    busyPreviousEditorReadOnly.delete(editor);
+  }
 }
 
 export function isPreviewZoomShortcut(
