@@ -270,6 +270,10 @@ fn parse_opening_svg_tag(suffix: &str) -> Option<OpeningSvgTag> {
         match ch {
             '"' | '\'' => quoted_attribute = Some(ch),
             '>' => {
+                if tag_content_has_nonterminal_slash(&suffix[..index]) {
+                    return None;
+                }
+
                 return Some(OpeningSvgTag {
                     end_index: index + ch.len_utf8(),
                     self_closing: suffix[..index].trim_end().ends_with('/'),
@@ -382,12 +386,38 @@ fn opening_tag_name(tag: &str) -> Option<&str> {
         return None;
     }
 
+    let tag_content = rest.strip_suffix('>')?;
+    if tag_content_has_nonterminal_slash(tag_content) {
+        return None;
+    }
+
     let name_end = tag_name_end(rest)?;
     if name_end == 0 || !tag_name_separator_is_valid(rest, name_end) {
         return None;
     }
 
     Some(&rest[..name_end])
+}
+
+fn tag_content_has_nonterminal_slash(tag_content: &str) -> bool {
+    let mut quoted_attribute = None;
+
+    for (index, ch) in tag_content.char_indices() {
+        if let Some(quote) = quoted_attribute {
+            if ch == quote {
+                quoted_attribute = None;
+            }
+            continue;
+        }
+
+        match ch {
+            '"' | '\'' => quoted_attribute = Some(ch),
+            '/' => return !tag_content[index + ch.len_utf8()..].trim().is_empty(),
+            _ => {}
+        }
+    }
+
+    false
 }
 
 fn tag_name_end(tag_body: &str) -> Option<usize> {
@@ -618,6 +648,30 @@ mod tests {
     }
 
     #[test]
+    fn rejects_svg_payloads_with_malformed_root_self_closing_slashes() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg / bogus></svg>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        let error = validate_diagram(&diagram).expect_err("expected malformed root rejection");
+        assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
+    }
+
+    #[test]
+    fn rejects_svg_payloads_with_malformed_child_self_closing_slashes() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg width=\"120\" height=\"120\"><g/ bogus></g></svg>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        let error = validate_diagram(&diagram).expect_err("expected malformed child rejection");
+        assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
+    }
+
+    #[test]
     fn rejects_svg_payloads_with_invalid_child_tag_names() {
         let diagram = MermaidClipboardDiagram {
             svg: String::from("<svg width=\"120\" height=\"120\"><g=bad></g=bad></svg>"),
@@ -674,6 +728,17 @@ mod tests {
         };
 
         validate_diagram(&diagram).expect("expected closed SVG payload to be valid");
+    }
+
+    #[test]
+    fn accepts_self_closing_svg_children() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg width=\"120\" height=\"120\"><g /></svg>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        validate_diagram(&diagram).expect("expected self-closing SVG child to be valid");
     }
 
     #[test]
