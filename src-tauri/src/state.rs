@@ -498,6 +498,10 @@ fn load_recent_paths(path: &Path) -> Vec<PathBuf> {
             continue;
         }
 
+        if path.exists() && !path.is_file() {
+            continue;
+        }
+
         if recent_paths
             .iter()
             .any(|candidate| same_recent_path(candidate, &path))
@@ -969,6 +973,34 @@ mod tests {
         let recent_paths = load_recent_paths(&path);
 
         assert_eq!(recent_paths, vec![absolute_plan, absolute_notes]);
+
+        fs::remove_file(&path).expect("failed to remove recent files");
+        cleanup_test_dir(&path);
+    }
+
+    #[test]
+    fn load_recent_paths_ignores_directories_named_like_markdown_files() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let path = unique_test_path("recent-files.json");
+        let recent_dir = path
+            .parent()
+            .expect("recent store path should have a parent");
+        let absolute_plan = recent_dir.join("plan.md");
+        let markdown_directory = recent_dir.join("archive.md");
+        fs::write(&absolute_plan, "# Plan").expect("failed to write markdown file");
+        fs::create_dir_all(&markdown_directory).expect("failed to create markdown-named dir");
+        let contents = serde_json::json!({
+            "recent_paths": [
+                markdown_directory.display().to_string(),
+                absolute_plan.display().to_string()
+            ]
+        });
+
+        fs::write(&path, contents.to_string()).expect("failed to write recent files");
+
+        let recent_paths = load_recent_paths(&path);
+
+        assert_eq!(recent_paths, vec![absolute_plan]);
 
         fs::remove_file(&path).expect("failed to remove recent files");
         cleanup_test_dir(&path);
