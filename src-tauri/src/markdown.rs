@@ -92,8 +92,8 @@ fn render_markdown(
 }
 
 fn rewrite_mermaid_content(markdown: &str) -> String {
-    let rewritten = rewrite_mermaid_blocks(markdown);
-    if rewritten.contains("<pre class=\"mermaid\">") {
+    let (rewritten, rewrote_mermaid_block) = rewrite_mermaid_blocks(markdown);
+    if rewrote_mermaid_block {
         return rewritten;
     }
 
@@ -104,12 +104,13 @@ fn rewrite_mermaid_content(markdown: &str) -> String {
     rewritten
 }
 
-fn rewrite_mermaid_blocks(markdown: &str) -> String {
+fn rewrite_mermaid_blocks(markdown: &str) -> (String, bool) {
     let mut output = String::new();
     let mut mermaid_buffer = Vec::new();
     let mut fence_marker = None;
     let mut fence_length = 0usize;
     let mut opening_fence = String::new();
+    let mut rewrote_mermaid_block = false;
 
     for line in markdown.lines() {
         if let Some(marker) = fence_marker {
@@ -117,6 +118,7 @@ fn rewrite_mermaid_blocks(markdown: &str) -> String {
                 output.push_str("<pre class=\"mermaid\">");
                 output.push_str(&escape_html(&mermaid_buffer.join("\n")));
                 output.push_str("</pre>\n");
+                rewrote_mermaid_block = true;
                 mermaid_buffer.clear();
                 fence_marker = None;
                 fence_length = 0;
@@ -150,7 +152,7 @@ fn rewrite_mermaid_blocks(markdown: &str) -> String {
         }
     }
 
-    output
+    (output, rewrote_mermaid_block)
 }
 
 fn render_raw_mermaid_document(markdown: &str) -> Option<String> {
@@ -443,8 +445,9 @@ sequenceDiagram
 ~~~
 "#;
 
-        let rewritten = rewrite_mermaid_blocks(input);
+        let (rewritten, rewrote_mermaid_block) = rewrite_mermaid_blocks(input);
 
+        assert!(rewrote_mermaid_block);
         assert_eq!(rewritten.matches("<pre class=\"mermaid\">").count(), 2);
         assert!(rewritten.contains("A[&quot;quoted &amp; linked&quot;] --&gt; B"));
         assert!(rewritten.contains("Alice-&gt;&gt;Bob: Hello &lt;world&gt;"));
@@ -474,8 +477,9 @@ fn main() {
 ```
 "#;
 
-        let rewritten = rewrite_mermaid_blocks(input);
+        let (rewritten, rewrote_mermaid_block) = rewrite_mermaid_blocks(input);
 
+        assert!(!rewrote_mermaid_block);
         assert!(rewritten.contains("```rust"));
         assert!(!rewritten.contains("<pre class=\"mermaid\">"));
     }
@@ -489,8 +493,9 @@ fn main() {
     ```
 "#;
 
-        let rewritten = rewrite_mermaid_blocks(input);
+        let (rewritten, rewrote_mermaid_block) = rewrite_mermaid_blocks(input);
 
+        assert!(!rewrote_mermaid_block);
         assert!(rewritten.contains("```mermaid"));
         assert!(rewritten.contains("flowchart TD"));
         assert!(!rewritten.contains("<pre class=\"mermaid\">"));
@@ -596,6 +601,19 @@ gitGraph TB:
         assert!(rendered.html.contains("<pre class=\"mermaid\">"));
         assert!(rendered.html.contains("flowchart-elk TD"));
         assert!(!rendered.html.contains("<p>flowchart-elk TD"));
+    }
+
+    #[test]
+    fn renders_raw_mermaid_documents_with_literal_mermaid_pre_labels() {
+        let rendered = untitled_document(
+            "Untitled",
+            r#"flowchart TD
+  A["<pre class="mermaid">"] --> B"#,
+        );
+
+        assert!(rendered.html.contains("<pre class=\"mermaid\">flowchart TD"));
+        assert!(rendered.html.contains("A[&quot;&lt;pre class=&quot;mermaid&quot;&gt;&quot;] --&gt; B"));
+        assert!(!rendered.html.contains("<p>flowchart TD"));
     }
 
     #[test]
