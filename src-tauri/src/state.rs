@@ -330,6 +330,7 @@ struct SavedWindowState {
     absolute_position: StoredPosition,
     monitor_offset: StoredPosition,
     outer_size: StoredSize,
+    #[serde(default)]
     maximized: bool,
 }
 
@@ -973,6 +974,59 @@ mod tests {
         assert_eq!(reloaded.monitor_index, None);
 
         fs::remove_file(&path).expect("failed to remove legacy window state");
+        cleanup_test_dir(&path);
+    }
+
+    #[test]
+    fn load_window_state_accepts_legacy_payloads_without_maximized() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let path = unique_test_path("legacy-window-state.json");
+
+        fs::write(
+            &path,
+            r#"{
+  "monitor_name": "Primary",
+  "monitor_index": 0,
+  "absolute_position": { "x": 32, "y": 48 },
+  "monitor_offset": { "x": 32, "y": 48 },
+  "outer_size": { "width": 1440, "height": 960 }
+}"#,
+        )
+        .expect("failed to write legacy window state");
+
+        let reloaded = load_window_state(&path).expect("expected saved window state");
+
+        assert_eq!(reloaded.monitor_name.as_deref(), Some("Primary"));
+        assert_eq!(reloaded.monitor_index, Some(0));
+        assert!(!reloaded.maximized);
+
+        fs::remove_file(&path).expect("failed to remove legacy window state");
+        cleanup_test_dir(&path);
+    }
+
+    #[test]
+    fn load_window_state_preserves_explicit_maximized_state() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let path = unique_test_path("maximized-window-state.json");
+
+        fs::write(
+            &path,
+            r#"{
+  "monitor_name": "Primary",
+  "monitor_index": 0,
+  "absolute_position": { "x": 32, "y": 48 },
+  "monitor_offset": { "x": 32, "y": 48 },
+  "outer_size": { "width": 1440, "height": 960 },
+  "maximized": true
+}"#,
+        )
+        .expect("failed to write maximized window state");
+
+        let reloaded = load_window_state(&path).expect("expected saved window state");
+
+        assert!(reloaded.maximized);
+
+        fs::remove_file(&path).expect("failed to remove maximized window state");
         cleanup_test_dir(&path);
     }
 
