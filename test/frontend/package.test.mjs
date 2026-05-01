@@ -22,6 +22,12 @@ function runTest(name, fn) {
   }
 }
 
+function viteDevServerAddress(command) {
+  const host = command.match(/--host\s+([^\s]+)/)?.[1];
+  const port = command.match(/--port\s+([^\s]+)/)?.[1];
+  return { host, port };
+}
+
 runTest("package scripts avoid platform-specific npm command shims", () => {
   for (const [name, command] of Object.entries(packageJson.scripts ?? {})) {
     assert.doesNotMatch(
@@ -30,6 +36,15 @@ runTest("package scripts avoid platform-specific npm command shims", () => {
       `${name} script should use npm, not the Windows-only npm.cmd shim`
     );
   }
+});
+
+runTest("tauri devUrl matches the Vite dev server bind address", () => {
+  const devScript = packageJson.scripts?.dev ?? "";
+  const devUrl = new URL(tauriConfig.build?.devUrl ?? "");
+  const { host, port } = viteDevServerAddress(devScript);
+
+  assert.equal(devUrl.hostname, host);
+  assert.equal(devUrl.port, port);
 });
 
 runTest("tauri build commands avoid platform-specific npm command shims", () => {
