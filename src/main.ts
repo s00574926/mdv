@@ -1513,7 +1513,7 @@ document.addEventListener("keydown", (event: KeyboardEvent) => {
     return;
   }
 
-  const shortcutAction = getShortcutAction(event);
+  const shortcutAction = getShortcutAction(event, isMacLike);
   if (!shortcutAction) {
     return;
   }

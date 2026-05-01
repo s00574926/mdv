@@ -23,24 +23,39 @@ runTest("isMacLikePlatform detects Apple platforms", () => {
 
 runTest("getShortcutAction maps standard command shortcuts", () => {
   assert.equal(
-    getShortcutAction({ key: "n", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false }),
+    getShortcutAction({ key: "n", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false }, false),
     "new"
   );
   assert.equal(
-    getShortcutAction({ key: "O", ctrlKey: true, metaKey: false, altKey: false, shiftKey: true }),
+    getShortcutAction({ key: "O", ctrlKey: true, metaKey: false, altKey: false, shiftKey: true }, false),
     "open-folder"
   );
   assert.equal(
-    getShortcutAction({ key: "Tab", ctrlKey: true, metaKey: false, altKey: false, shiftKey: true }),
+    getShortcutAction({ key: "Tab", ctrlKey: true, metaKey: false, altKey: false, shiftKey: true }, false),
     "previous-tab"
   );
   assert.equal(
-    getShortcutAction({ key: "w", ctrlKey: false, metaKey: true, altKey: false, shiftKey: false }),
+    getShortcutAction({ key: "w", ctrlKey: false, metaKey: true, altKey: false, shiftKey: false }, true),
     "close-tab"
   );
   assert.equal(
-    getShortcutAction({ key: "s", ctrlKey: false, metaKey: false, altKey: false, shiftKey: false }),
+    getShortcutAction({ key: "s", ctrlKey: false, metaKey: false, altKey: false, shiftKey: false }, false),
     undefined
+  );
+});
+
+runTest("getShortcutAction requires the platform primary modifier", () => {
+  assert.equal(
+    getShortcutAction({ key: "s", ctrlKey: false, metaKey: true, altKey: false, shiftKey: false }, false),
+    undefined
+  );
+  assert.equal(
+    getShortcutAction({ key: "s", ctrlKey: true, metaKey: false, altKey: false, shiftKey: false }, true),
+    undefined
+  );
+  assert.equal(
+    getShortcutAction({ key: "s", ctrlKey: false, metaKey: true, altKey: false, shiftKey: false }, true),
+    "save"
   );
 });
 
