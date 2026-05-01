@@ -99,10 +99,21 @@ fn should_refresh_current_document(event: &Event, watched_path: &Path) -> bool {
         return false;
     }
 
-    event
+    if event
         .paths
         .iter()
         .any(|candidate| same_path(candidate, watched_path))
+    {
+        return true;
+    }
+
+    matches!(event.kind, EventKind::Modify(ModifyKind::Name(_)))
+        && !watched_path.exists()
+        && event.paths.iter().any(|candidate| {
+            watched_path.parent().zip(candidate.parent()).is_some_and(
+                |(watched_parent, candidate_parent)| same_path(candidate_parent, watched_parent),
+            )
+        })
 }
 
 fn should_refresh_workspace_explorer(event: &Event, watched_root: &Path) -> bool {
@@ -314,6 +325,44 @@ mod tests {
 
         fs::remove_file(&watched_path).expect("failed to remove watched file");
         fs::remove_file(&other_path).expect("failed to remove other file");
+        cleanup_test_dir(&watched_path);
+    }
+
+    #[test]
+    fn refreshes_current_document_for_single_rename_to_when_watched_file_disappears() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let watched_path = unique_test_path("watched.md");
+        let renamed_path = watched_path.with_file_name("watched.txt");
+        fs::create_dir_all(watched_path.parent().expect("missing parent"))
+            .expect("failed to create dir");
+        fs::write(&renamed_path, "# renamed").expect("failed to seed renamed file");
+
+        let event = Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::To)))
+            .add_path(renamed_path.clone());
+
+        assert!(should_refresh_current_document(&event, &watched_path));
+
+        fs::remove_file(&renamed_path).expect("failed to remove renamed file");
+        cleanup_test_dir(&watched_path);
+    }
+
+    #[test]
+    fn ignores_current_document_single_rename_to_while_watched_file_exists() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let watched_path = unique_test_path("watched.md");
+        let renamed_path = watched_path.with_file_name("other.txt");
+        fs::create_dir_all(watched_path.parent().expect("missing parent"))
+            .expect("failed to create dir");
+        fs::write(&watched_path, "# watched").expect("failed to seed watched file");
+        fs::write(&renamed_path, "ignore").expect("failed to seed renamed file");
+
+        let event = Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::To)))
+            .add_path(renamed_path.clone());
+
+        assert!(!should_refresh_current_document(&event, &watched_path));
+
+        fs::remove_file(&watched_path).expect("failed to remove watched file");
+        fs::remove_file(&renamed_path).expect("failed to remove renamed file");
         cleanup_test_dir(&watched_path);
     }
 
