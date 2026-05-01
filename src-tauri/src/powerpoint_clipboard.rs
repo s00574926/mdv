@@ -222,10 +222,12 @@ fn looks_like_svg_document(svg: &str) -> bool {
         return false;
     }
 
-    document[4..]
+    let suffix = &document[4..];
+    suffix.starts_with("/>")
+        || suffix
         .chars()
         .next()
-        .is_some_and(|next| next == '>' || next == '/' || next.is_ascii_whitespace())
+        .is_some_and(|next| next == '>' || next.is_ascii_whitespace())
 }
 
 fn compute_target_bounds(source_width: f64, source_height: f64) -> Result<TargetBounds> {
@@ -320,6 +322,29 @@ mod tests {
 
         let error = validate_diagram(&diagram).expect_err("expected non-SVG payload rejection");
         assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
+    }
+
+    #[test]
+    fn rejects_svg_prefixes_that_are_not_svg_elements() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg/onload=alert(1)>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        let error = validate_diagram(&diagram).expect_err("expected malformed SVG rejection");
+        assert_eq!(error.to_string(), "Mermaid diagram SVG is invalid.");
+    }
+
+    #[test]
+    fn accepts_self_closing_svg_clipboard_payloads() {
+        let diagram = MermaidClipboardDiagram {
+            svg: String::from("<svg/>"),
+            width: 120.0,
+            height: 120.0,
+        };
+
+        validate_diagram(&diagram).expect("expected self-closing SVG payload to be valid");
     }
 
     #[test]
