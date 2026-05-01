@@ -615,7 +615,7 @@ fn normalize_recent_path_components(path: &Path) -> PathBuf {
         match component {
             Component::CurDir => {}
             Component::ParentDir => {
-                if !normalized.pop() {
+                if !normalized.pop() && !normalized.has_root() {
                     normalized.push(component.as_os_str());
                 }
             }
@@ -1154,6 +1154,36 @@ mod tests {
         cleanup_test_dir(&path);
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn load_recent_paths_normalizes_parent_components_at_root() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let path = unique_test_path("recent-files.json");
+        let drive_root = std::env::current_dir()
+            .expect("failed to resolve current directory")
+            .ancestors()
+            .last()
+            .expect("current directory should have a filesystem root")
+            .to_path_buf();
+        let absolute_plan = drive_root.join("plan.md");
+        let root_parent_alias = drive_root.join("..").join("plan.md");
+        let contents = serde_json::json!({
+            "recent_paths": [
+                root_parent_alias.display().to_string(),
+                absolute_plan.display().to_string()
+            ]
+        });
+
+        fs::write(&path, contents.to_string()).expect("failed to write aliased recent files");
+
+        let recent_paths = load_recent_paths(&path);
+
+        assert_eq!(recent_paths, vec![absolute_plan]);
+
+        fs::remove_file(&path).expect("failed to remove recent files");
+        cleanup_test_dir(&path);
+    }
+
     #[test]
     fn load_recent_paths_ignores_relative_persisted_entries() {
         let _filesystem_test_lock = filesystem_test_lock();
@@ -1354,6 +1384,16 @@ mod tests {
             Path::new(r"\\?\UNC\server\share\Plan.md"),
             Path::new(r"\\server\share\plan.md")
         ));
+    }
+
+    #[test]
+    fn normalize_recent_path_components_preserves_leading_relative_parents() {
+        let relative_parent_path = PathBuf::from("..").join("plan.md");
+
+        assert_eq!(
+            super::normalize_recent_path_components(&relative_parent_path),
+            relative_parent_path
+        );
     }
 
     #[test]
