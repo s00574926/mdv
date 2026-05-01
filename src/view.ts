@@ -4,7 +4,8 @@ export const MIN_PREVIEW_SCALE = 0.5;
 export const MAX_PREVIEW_SCALE = 2.5;
 
 const PREVIEW_SCALE_STEP = 0.1;
-const busyPreviousEditorReadOnly = new WeakMap<Pick<EditorLike, "readOnly">, boolean>();
+const busyControlStates = new WeakMap<BusyControlLike, BusyControlState>();
+const busyEditorStates = new WeakMap<Pick<EditorLike, "readOnly">, BusyEditorState>();
 
 export interface RenderedDocument {
   title: string;
@@ -93,6 +94,16 @@ interface BusyControlLike {
   };
 }
 
+interface BusyControlState {
+  depth: number;
+  previousDisabled: boolean;
+}
+
+interface BusyEditorState {
+  depth: number;
+  previousReadOnly: boolean;
+}
+
 export interface ViewElements {
   appRoot: {
     classList: ClassListLike;
@@ -135,33 +146,61 @@ export function setBusyStateForControls(
 ): void {
   for (const control of controls) {
     if (isBusy) {
-      if (control.dataset && control.dataset.busyPreviousDisabled === undefined) {
-        control.dataset.busyPreviousDisabled = String(control.disabled);
+      const state = busyControlStates.get(control);
+      if (state) {
+        state.depth += 1;
+      } else {
+        busyControlStates.set(control, {
+          depth: 1,
+          previousDisabled: control.disabled
+        });
       }
       control.disabled = true;
       continue;
     }
 
-    if (control.dataset?.busyPreviousDisabled === undefined) {
+    const state = busyControlStates.get(control);
+    if (!state) {
       continue;
     }
 
-    control.disabled = control.dataset.busyPreviousDisabled === "true";
-    delete control.dataset.busyPreviousDisabled;
+    state.depth -= 1;
+    if (state.depth > 0) {
+      control.disabled = true;
+      continue;
+    }
+
+    control.disabled = state.previousDisabled;
+    busyControlStates.delete(control);
   }
 
   if (isBusy) {
-    if (!busyPreviousEditorReadOnly.has(editor)) {
-      busyPreviousEditorReadOnly.set(editor, Boolean(editor.readOnly));
+    const state = busyEditorStates.get(editor);
+    if (state) {
+      state.depth += 1;
+    } else {
+      busyEditorStates.set(editor, {
+        depth: 1,
+        previousReadOnly: Boolean(editor.readOnly)
+      });
     }
     editor.readOnly = true;
     return;
   }
 
-  if (busyPreviousEditorReadOnly.has(editor)) {
-    editor.readOnly = busyPreviousEditorReadOnly.get(editor) ?? false;
-    busyPreviousEditorReadOnly.delete(editor);
+  const state = busyEditorStates.get(editor);
+  if (!state) {
+    return;
   }
+
+  state.depth -= 1;
+  if (state.depth > 0) {
+    editor.readOnly = true;
+    return;
+  }
+
+  editor.readOnly = state.previousReadOnly;
+  busyEditorStates.delete(editor);
 }
 
 export function isPreviewZoomShortcut(

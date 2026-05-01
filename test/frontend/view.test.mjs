@@ -469,6 +469,23 @@ runTest("setBusyStateForControls preserves an editor that was already read-only"
   assert.equal(editor.readOnly, true);
 });
 
+runTest("setBusyStateForControls keeps controls disabled while busy states overlap", () => {
+  const button = { disabled: false, dataset: {} };
+  const editor = { value: "", readOnly: false };
+
+  setBusyStateForControls([button], editor, true);
+  setBusyStateForControls([button], editor, true);
+  setBusyStateForControls([button], editor, false);
+
+  assert.equal(button.disabled, true);
+  assert.equal(editor.readOnly, true);
+
+  setBusyStateForControls([button], editor, false);
+
+  assert.equal(button.disabled, false);
+  assert.equal(editor.readOnly, false);
+});
+
 runTest("shouldShowEditorPreview only enables untitled Mermaid previews", () => {
   assert.equal(
     shouldShowEditorPreview(
