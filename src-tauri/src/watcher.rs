@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use notify::{
     Event, RecommendedWatcher, RecursiveMode, Watcher,
-    event::{CreateKind, EventKind, ModifyKind, RemoveKind},
+    event::{CreateKind, EventKind, ModifyKind, RemoveKind, RenameMode},
     recommended_watcher,
 };
 use std::{
@@ -121,7 +121,7 @@ fn should_refresh_workspace_explorer(event: &Event, watched_root: &Path) -> bool
     }
 
     if matches!(event.kind, EventKind::Modify(ModifyKind::Name(_))) {
-        return should_refresh_for_name_modify(&paths_in_workspace);
+        return should_refresh_for_name_modify(&event.kind, &paths_in_workspace);
     }
 
     event.kind.is_modify()
@@ -143,14 +143,27 @@ fn should_refresh_for_create_or_remove(event_kind: &EventKind, paths: &[&PathBuf
     }
 }
 
-fn should_refresh_for_name_modify(paths: &[&PathBuf]) -> bool {
-    if paths.len() <= 1 {
+fn should_refresh_for_name_modify(event_kind: &EventKind, paths: &[&PathBuf]) -> bool {
+    if paths.len() > 1 {
+        return paths
+            .iter()
+            .any(|candidate| path_may_affect_explorer(candidate));
+    }
+
+    let Some(path) = paths.first() else {
+        return false;
+    };
+
+    if path_may_affect_explorer(path) {
         return true;
     }
 
-    paths
-        .iter()
-        .any(|candidate| path_may_affect_explorer(candidate))
+    matches!(
+        event_kind,
+        EventKind::Modify(ModifyKind::Name(
+            RenameMode::Any | RenameMode::From | RenameMode::Both | RenameMode::Other
+        ))
+    ) || !path.exists()
 }
 
 fn path_is_within_root(candidate: &Path, watched_root: &Path) -> bool {
@@ -352,6 +365,22 @@ mod tests {
         let event = Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::Both)))
             .add_path(root.join("notes.txt"))
             .add_path(root.join("renamed.txt"));
+
+        assert!(!should_refresh_workspace_explorer(&event, &root));
+
+        cleanup_test_dir(&root);
+    }
+
+    #[test]
+    fn ignores_workspace_explorer_for_single_non_markdown_rename_to() {
+        let _filesystem_test_lock = filesystem_test_lock();
+        let root = unique_test_path("workspace");
+        let renamed_text = root.join("renamed.txt");
+        fs::create_dir_all(&root).expect("failed to create root");
+        fs::write(&renamed_text, "ignore").expect("failed to create text file");
+
+        let event = Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::To)))
+            .add_path(renamed_text);
 
         assert!(!should_refresh_workspace_explorer(&event, &root));
 
