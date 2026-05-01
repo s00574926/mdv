@@ -238,7 +238,7 @@ fn normalize_dot_components(path: &Path) -> PathBuf {
         match component {
             Component::CurDir => {}
             Component::ParentDir => {
-                if !normalized.pop() {
+                if !normalized.pop() && !normalized.has_root() {
                     normalized.push(component.as_os_str());
                 }
             }
@@ -485,6 +485,29 @@ mod tests {
         assert_eq!(
             normalize_path_for_compare(Path::new(r"\\?\unc\server\share\plan.md")),
             PathBuf::from(r"\\server\share\plan.md")
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn same_path_clamps_windows_parent_components_at_roots() {
+        assert!(same_path(
+            Path::new(r"C:\..\Plan.md"),
+            Path::new(r"c:\plan.md")
+        ));
+        assert!(same_path(
+            Path::new(r"\\server\share\..\Plan.md"),
+            Path::new(r"\\server\share\plan.md")
+        ));
+    }
+
+    #[test]
+    fn normalize_path_for_compare_preserves_leading_relative_parents() {
+        let relative_parent_path = PathBuf::from("..").join("plan.md");
+
+        assert_eq!(
+            normalize_path_for_compare(&relative_parent_path),
+            relative_parent_path
         );
     }
 
