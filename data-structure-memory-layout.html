@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>mdv Data Structure and Memory Layout</title>
+  <style>
+    :root {
+      --ink: #111827;
+      --muted: #5f6368;
+      --line: #294866;
+      --blue-fill: #dceeff;
+      --blue-stroke: #2f6fa8;
+      --green-fill: #dcf7e7;
+      --green-stroke: #2d9a6b;
+      --orange-fill: #fff0d9;
+      --orange-stroke: #c96b2c;
+      --purple-fill: #efe7ff;
+      --purple-stroke: #7d4bb0;
+      --gray-fill: #f4f4f4;
+      --gray-stroke: #c7c7c7;
+      --red-fill: #fae4e5;
+      --red-stroke: #b23a3f;
+      --canvas: #ffffff;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #f7fafc;
+      color: var(--ink);
+    }
+
+    main {
+      width: min(100%, 1660px);
+      margin: 0 auto;
+      padding: 30px 24px 44px;
+    }
+
+    h1 {
+      margin: 0;
+      text-align: center;
+      font-size: 34px;
+      line-height: 1.25;
+      font-weight: 780;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      max-width: 960px;
+      margin: 10px auto 24px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 16px;
+      line-height: 1.45;
+    }
+
+    .sheet {
+      padding: 28px;
+      background: var(--canvas);
+      border: 1px solid #d7e0e8;
+      border-radius: 12px;
+      overflow-x: auto;
+    }
+
+    .section-title {
+      margin: 0 0 6px;
+      font-size: 21px;
+      line-height: 1.25;
+      font-weight: 780;
+    }
+
+    .section-note {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .runtime-grid {
+      min-width: 1480px;
+      display: grid;
+      grid-template-columns: 310px 52px 510px 52px 310px 52px 300px;
+      gap: 0;
+      align-items: start;
+    }
+
+    .column {
+      display: grid;
+      gap: 18px;
+    }
+
+    .connector {
+      position: relative;
+      height: 100%;
+      min-height: 610px;
+    }
+
+    .connector::before {
+      content: "";
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      height: 2px;
+      background: var(--line);
+      top: 112px;
+    }
+
+    .connector::after {
+      content: "";
+      position: absolute;
+      right: 8px;
+      top: 105px;
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+      border-left: 12px solid var(--line);
+    }
+
+    .connector.down::before {
+      left: 25px;
+      right: auto;
+      top: 42px;
+      width: 2px;
+      height: 238px;
+    }
+
+    .connector.down::after {
+      left: 18px;
+      right: auto;
+      top: 276px;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-top: 12px solid var(--line);
+      border-bottom: none;
+    }
+
+    .card {
+      border: 1.6px solid var(--gray-stroke);
+      border-radius: 12px;
+      background: var(--gray-fill);
+      overflow: hidden;
+    }
+
+    .card.blue {
+      border-color: var(--blue-stroke);
+      background: var(--blue-fill);
+    }
+
+    .card.green {
+      border-color: var(--green-stroke);
+      background: var(--green-fill);
+    }
+
+    .card.orange {
+      border-color: var(--orange-stroke);
+      background: var(--orange-fill);
+    }
+
+    .card.purple {
+      border-color: var(--purple-stroke);
+      background: var(--purple-fill);
+    }
+
+    .card.red {
+      border-color: var(--red-stroke);
+      background: var(--red-fill);
+    }
+
+    .card-head {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid rgba(17, 24, 39, 0.12);
+    }
+
+    .card-title {
+      display: block;
+      font-size: 16px;
+      line-height: 1.22;
+      font-weight: 780;
+    }
+
+    .card-subtitle {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: rgba(255, 255, 255, 0.62);
+      table-layout: fixed;
+    }
+
+    th,
+    td {
+      padding: 9px 12px;
+      border-bottom: 1px solid rgba(17, 24, 39, 0.11);
+      vertical-align: top;
+      font-size: 12.5px;
+      line-height: 1.35;
+      text-align: left;
+      overflow-wrap: anywhere;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    th {
+      color: #25364a;
+      font-weight: 760;
+      background: rgba(255, 255, 255, 0.36);
+    }
+
+    code,
+    .mono {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      margin-right: 6px;
+      border: 1.4px solid var(--line);
+      border-radius: 50%;
+      color: var(--line);
+      background: #fff;
+      font-size: 12px;
+      font-weight: 780;
+    }
+
+    .lane-label {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 720;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .memory-section {
+      min-width: 1480px;
+      margin-top: 34px;
+      padding-top: 28px;
+      border-top: 1px dashed #b8c7d5;
+    }
+
+    .memory-grid {
+      display: grid;
+      grid-template-columns: 1fr 32px 1fr 32px 1fr;
+      gap: 0;
+      align-items: start;
+    }
+
+    .memory-arrow {
+      position: relative;
+    }
+
+    .memory-arrow::before {
+      content: "";
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      top: 50%;
+      height: 2px;
+      background: var(--line);
+    }
+
+    .memory-arrow::after {
+      content: "";
+      position: absolute;
+      right: 2px;
+      top: calc(50% - 7px);
+      border-top: 7px solid transparent;
+      border-bottom: 7px solid transparent;
+      border-left: 10px solid var(--line);
+    }
+
+    .slot-table td:first-child {
+      width: 38%;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      color: #1f3d5b;
+      white-space: nowrap;
+    }
+
+    .callout-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      min-width: 1480px;
+      margin-top: 22px;
+    }
+
+    .callout {
+      padding: 14px 16px;
+      border: 1.4px solid #d8be72;
+      border-radius: 10px;
+      background: #fffdf6;
+    }
+
+    .callout strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #5b4300;
+      font-size: 14px;
+    }
+
+    .callout span {
+      display: block;
+      color: #4b5563;
+      font-size: 12.5px;
+      line-height: 1.4;
+    }
+
+    .source {
+      min-width: 1480px;
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>mdv Workspace Data Structure Layout</h1>
+    <p class="subtitle">
+      Source-derived struct map showing how the Rust session state becomes the serialized preview payload, plus a conceptual memory slot for the rendered document cache.
+    </p>
+
+    <div class="sheet">
+      <h2 class="section-title">Runtime Ownership Graph</h2>
+      <p class="section-note">
+        Boxes are real Rust or TypeScript-facing structures. Arrows show ownership, cloning, or serialization flow rather than CPU pointer offsets.
+      </p>
+
+      <section class="runtime-grid" aria-label="Runtime data structure diagram">
+        <div class="column">
+          <p class="lane-label">Application state</p>
+          <article class="card blue">
+            <div class="card-head">
+              <span class="card-title"><span class="badge">1</span>AppState</span>
+              <span class="card-subtitle">src-tauri/src/state.rs</span>
+            </div>
+            <table>
+              <tr><th>field</th><th>role</th></tr>
+              <tr><td><code>session</code></td><td><code>Mutex&lt;AppSession&gt;</code> protects mutable workspace state.</td></tr>
+              <tr><td><code>recent_store_path</code></td><td>JSON persistence target for recent files.</td></tr>
+              <tr><td><code>saved_window_state</code></td><td>Loaded window geometry and maximized state.</td></tr>
+              <tr><td><code>window_state_store_path</code></td><td>JSON persistence target for window state.</td></tr>
+            </table>
+          </article>
+        </div>
+
+        <div class="connector" aria-hidden="true"></div>
+
+        <div class="column">
+          <p class="lane-label">Locked session heap object</p>
+          <article class="card green">
+            <div class="card-head">
+              <span class="card-title"><span class="badge">2</span>AppSession</span>
+              <span class="card-subtitle">state.rs / Default</span>
+            </div>
+            <table>
+              <tr><th>field group</th><th>shape</th><th>meaning</th></tr>
+              <tr><td>documents</td><td><code>Vec&lt;OpenDocumentSession&gt;</code></td><td>All open tabs, including saved files, folders, and untitled drafts.</td></tr>
+              <tr><td>active tab</td><td><code>Option&lt;usize&gt;</code></td><td>Index into <code>documents</code>; cleared if stale during snapshot.</td></tr>
+              <tr><td>watchers</td><td><code>Option&lt;RecommendedWatcher&gt;</code></td><td>Native file/folder watchers for active document and explorer root.</td></tr>
+              <tr><td>watch paths</td><td><code>Option&lt;PathBuf&gt;</code></td><td>Paths used to decide when watchers/cache are stale.</td></tr>
+              <tr><td>preview cache</td><td><code>Option&lt;CachedRenderedDocument&gt;</code></td><td>Single-entry cache for the active rendered Markdown file.</td></tr>
+              <tr><td>explorer cache</td><td><code>HashMap&lt;PathBuf, ExplorerRoot&gt;</code></td><td>Directory tree payloads keyed by workspace root.</td></tr>
+              <tr><td>recent/draft</td><td><code>Vec&lt;PathBuf&gt;</code>, <code>usize</code></td><td>Recent paths and the next untitled document number.</td></tr>
+            </table>
+          </article>
+
+          <article class="card gray">
+            <div class="card-head">
+              <span class="card-title">OpenDocumentSession</span>
+              <span class="card-subtitle">state.rs</span>
+            </div>
+            <table>
+              <tr><td><code>path: Option&lt;PathBuf&gt;</code></td><td>Present for a saved Markdown file.</td></tr>
+              <tr><td><code>directory: Option&lt;PathBuf&gt;</code></td><td>Present when the active tab represents a folder context.</td></tr>
+              <tr><td><code>untitled_number: Option&lt;usize&gt;</code></td><td>Draft label source.</td></tr>
+              <tr><td><code>content: String</code></td><td>Live editor buffer for untitled documents.</td></tr>
+            </table>
+          </article>
+        </div>
+
+        <div class="connector" aria-hidden="true"></div>
+
+        <div class="column">
+          <p class="lane-label">Snapshot boundary</p>
+          <article class="card purple">
+            <div class="card-head">
+              <span class="card-title"><span class="badge">3</span>WorkspaceSnapshot</span>
+              <span class="card-subtitle">workspace_session.rs</span>
+            </div>
+            <table>
+              <tr><td><code>active_document</code></td><td>Cloned active <code>OpenDocumentSession</code>.</td></tr>
+              <tr><td><code>active_document_index</code></td><td>Validated active tab index.</td></tr>
+              <tr><td><code>watching</code></td><td>True only when active saved file has an active watcher.</td></tr>
+              <tr><td><code>recent_paths</code></td><td>Cloned recent file list.</td></tr>
+              <tr><td><code>document_tabs</code></td><td>Cloned tab labels and unsaved flags.</td></tr>
+            </table>
+          </article>
+        </div>
+
+        <div class="connector" aria-hidden="true"></div>
+
+        <div class="column">
+          <p class="lane-label">Tauri payload</p>
+          <article class="card orange">
+            <div class="card-head">
+              <span class="card-title"><span class="badge">4</span>WorkspacePayload</span>
+              <span class="card-subtitle">workspace_payload.rs</span>
+            </div>
+            <table>
+              <tr><td><code>document</code></td><td>Nested <code>RenderedDocument</code>.</td></tr>
+              <tr><td><code>editorText</code></td><td>Only set for untitled/editor preview.</td></tr>
+              <tr><td><code>currentFilePath</code></td><td>Display path for the active saved file.</td></tr>
+              <tr><td><code>explorer</code></td><td>Optional <code>ExplorerRoot</code> tree.</td></tr>
+              <tr><td><code>documentTabs</code></td><td>Serialized tab DTOs.</td></tr>
+              <tr><td><code>recentPaths</code></td><td>Stringified paths for menu rendering.</td></tr>
+            </table>
+          </article>
+        </div>
+      </section>
+
+      <section class="memory-section" aria-label="Rendered document cache memory layout">
+        <h2 class="section-title">Rendered Document Cache Slot</h2>
+        <p class="section-note">
+          Conceptual Rust ownership layout. This is not a byte-accurate ABI map; it shows the discriminants, owned values, and clone boundaries visible in the source.
+        </p>
+
+        <div class="memory-grid">
+          <article class="card green">
+            <div class="card-head">
+              <span class="card-title"><span class="badge">A</span><code>AppSession.rendered_document</code></span>
+              <span class="card-subtitle">Option&lt;CachedRenderedDocument&gt;</span>
+            </div>
+            <table class="slot-table">
+              <tr><th>slot</th><th>contents</th></tr>
+              <tr><td>None</td><td>No active rendered file cache, or cache invalidated by tab/watch changes.</td></tr>
+              <tr><td>Some(...)</td><td>Single cached document for one path only.</td></tr>
+            </table>
+          </article>
+
+          <div class="memory-arrow" aria-hidden="true"></div>
+
+          <article class="card orange">
+            <div class="card-head">
+              <span class="card-title"><span class="badge">B</span>CachedRenderedDocument</span>
+              <span class="card-subtitle">state.rs</span>
+            </div>
+            <table class="slot-table">
+              <tr><th>field</th><th>stored value</th></tr>
+              <tr><td><code>path: PathBuf</code></td><td>Cache key; must equal the requested active path.</td></tr>
+              <tr><td><code>document</code></td><td>Owned <code>markdown::RenderedDocument</code> clone retained in session.</td></tr>
+            </table>
+          </article>
+
+          <div class="memory-arrow" aria-hidden="true"></div>
+
+          <article class="card blue">
+            <div class="card-head">
+              <span class="card-title"><span class="badge">C</span>RenderedDocument clone</span>
+              <span class="card-subtitle">markdown.rs</span>
+            </div>
+            <table class="slot-table">
+              <tr><th>field</th><th>serialized meaning</th></tr>
+              <tr><td><code>title</code></td><td>Display title from file stem or untitled label.</td></tr>
+              <tr><td><code>html</code></td><td>Comrak output after Mermaid and local reference rewriting.</td></tr>
+              <tr><td><code>sourceName</code></td><td>File name for UI context.</td></tr>
+              <tr><td><code>sourcePath</code></td><td>Display path string.</td></tr>
+              <tr><td><code>watching</code></td><td>Patched on cache hit before returning the clone.</td></tr>
+              <tr><td><code>trustModel</code></td><td><code>trusted-local-markdown-preview</code>.</td></tr>
+            </table>
+          </article>
+        </div>
+      </section>
+
+      <div class="callout-row">
+        <div class="callout">
+          <strong>One rendered cache entry</strong>
+          <span>The session stores only one <code>CachedRenderedDocument</code>, not a per-tab map. A path mismatch forces a fresh render.</span>
+        </div>
+        <div class="callout">
+          <strong>Snapshots avoid holding the lock</strong>
+          <span><code>workspace_session::snapshot</code> clones the active document, tabs, and recent paths, then payload assembly works from that copy.</span>
+        </div>
+        <div class="callout">
+          <strong>DTOs are camelCase</strong>
+          <span><code>serde(rename_all = "camelCase")</code> makes the Rust payload line up with the frontend <code>WorkspacePayload</code> interface.</span>
+        </div>
+      </div>
+
+      <p class="source">
+        Sources: <code>src-tauri/src/state.rs</code> (<code>AppState</code>, <code>AppSession</code>, cache helpers),
+        <code>src-tauri/src/workspace_session.rs</code> (<code>WorkspaceSnapshot</code>, tab DTO construction),
+        <code>src-tauri/src/workspace_payload.rs</code> (<code>WorkspacePayload</code>, explorer tree DTOs),
+        and <code>src-tauri/src/markdown.rs</code> (<code>RenderedDocument</code>).
+      </p>
+    </div>
+  </main>
+</body>
+</html>

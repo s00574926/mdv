@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RenderedDocument Raw Memory Layout</title>
+  <style>
+    :root {
+      --ink: #111827;
+      --muted: #5f6368;
+      --line: #294866;
+      --grid: #9bb2c5;
+      --blue-fill: #dceeff;
+      --blue-stroke: #2f6fa8;
+      --green-fill: #dcf7e7;
+      --green-stroke: #2d9a6b;
+      --orange-fill: #fff0d9;
+      --orange-stroke: #c96b2c;
+      --yellow-fill: #fff5c7;
+      --yellow-stroke: #c98a18;
+      --purple-fill: #efe7ff;
+      --purple-stroke: #7d4bb0;
+      --red-fill: #fae4e5;
+      --red-stroke: #b23a3f;
+      --gray-fill: #f4f4f4;
+      --gray-stroke: #c7c7c7;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #f7fafc;
+    }
+
+    main {
+      width: min(100%, 1680px);
+      margin: 0 auto;
+      padding: 30px 24px 44px;
+    }
+
+    h1 {
+      margin: 0;
+      text-align: center;
+      font-size: 34px;
+      line-height: 1.25;
+      font-weight: 780;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      max-width: 1040px;
+      margin: 10px auto 24px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 16px;
+      line-height: 1.45;
+    }
+
+    .sheet {
+      min-width: 1500px;
+      padding: 28px;
+      background: #fff;
+      border: 1px solid #d7e0e8;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .top-grid {
+      display: grid;
+      grid-template-columns: 540px 1fr 320px;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .panel {
+      border: 1.6px solid var(--gray-stroke);
+      border-radius: 12px;
+      background: var(--gray-fill);
+      overflow: hidden;
+    }
+
+    .panel.blue {
+      border-color: var(--blue-stroke);
+      background: var(--blue-fill);
+    }
+
+    .panel.green {
+      border-color: var(--green-stroke);
+      background: var(--green-fill);
+    }
+
+    .panel.orange {
+      border-color: var(--orange-stroke);
+      background: var(--orange-fill);
+    }
+
+    .panel.purple {
+      border-color: var(--purple-stroke);
+      background: var(--purple-fill);
+    }
+
+    .panel.yellow {
+      border-color: var(--yellow-stroke);
+      background: var(--yellow-fill);
+    }
+
+    .panel.red {
+      border-color: var(--red-stroke);
+      background: var(--red-fill);
+    }
+
+    .panel-head {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid rgba(17, 24, 39, 0.12);
+    }
+
+    .panel-title {
+      display: block;
+      font-size: 17px;
+      line-height: 1.25;
+      font-weight: 780;
+    }
+
+    .panel-subtitle {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .mono,
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .struct-layout {
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.64);
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 72px 124px repeat(3, 1fr);
+      min-height: 46px;
+      border: 1px solid rgba(17, 24, 39, 0.12);
+      border-bottom: 0;
+      background: #fff;
+    }
+
+    .field-row:last-child {
+      border-bottom: 1px solid rgba(17, 24, 39, 0.12);
+    }
+
+    .field-row.header {
+      min-height: 34px;
+      color: #24384d;
+      font-weight: 760;
+      background: #eef3f7;
+    }
+
+    .field-row > div {
+      padding: 8px 9px;
+      border-right: 1px solid rgba(17, 24, 39, 0.11);
+      font-size: 12px;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .field-row > div:last-child {
+      border-right: none;
+    }
+
+    .slot {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-weight: 760;
+      color: #18334c;
+    }
+
+    .field {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-weight: 760;
+    }
+
+    .ptr {
+      color: #184f89;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    .heap {
+      display: grid;
+      gap: 14px;
+      padding: 14px;
+    }
+
+    .heap-block {
+      border: 1.4px solid #c4d1de;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.78);
+      overflow: hidden;
+    }
+
+    .heap-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 9px 12px 7px;
+      border-bottom: 1px solid rgba(17, 24, 39, 0.1);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .byte-strip {
+      display: grid;
+      grid-template-columns: repeat(16, 1fr);
+      gap: 3px;
+      padding: 10px 12px 12px;
+      background: #fbfdff;
+    }
+
+    .byte {
+      min-height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #cbd8e3;
+      border-radius: 5px;
+      background: #fff;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 11px;
+      line-height: 1;
+    }
+
+    .byte.pad {
+      color: #818a94;
+      background: #f2f4f6;
+      border-style: dashed;
+    }
+
+    .byte.static {
+      background: #efe7ff;
+      border-color: #9b78cf;
+    }
+
+    .note-stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .note {
+      padding: 14px 16px;
+      border: 1.4px solid #d8be72;
+      border-radius: 10px;
+      background: #fffdf6;
+    }
+
+    .note.red {
+      border-color: var(--red-stroke);
+      background: var(--red-fill);
+    }
+
+    .note strong {
+      display: block;
+      margin-bottom: 7px;
+      color: #5b4300;
+      font-size: 14px;
+    }
+
+    .note.red strong {
+      color: #7f1d1d;
+    }
+
+    .note span {
+      display: block;
+      color: #4b5563;
+      font-size: 12.5px;
+      line-height: 1.42;
+    }
+
+    .arrow-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-top: 24px;
+    }
+
+    .mini {
+      position: relative;
+      padding: 14px 14px 14px 42px;
+      border: 1.4px solid #c5d3df;
+      border-radius: 10px;
+      background: #f8fbfd;
+    }
+
+    .mini::before {
+      content: attr(data-step);
+      position: absolute;
+      left: 13px;
+      top: 14px;
+      display: flex;
+      width: 20px;
+      height: 20px;
+      align-items: center;
+      justify-content: center;
+      border: 1.4px solid var(--line);
+      border-radius: 50%;
+      background: #fff;
+      color: var(--line);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .mini strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 13px;
+    }
+
+    .mini span {
+      display: block;
+      color: #4b5563;
+      font-size: 12px;
+      line-height: 1.38;
+    }
+
+    .source {
+      margin: 20px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Raw Memory Layout: <code>markdown::RenderedDocument</code></h1>
+    <p class="subtitle">
+      A creative byte-level view of one rendered preview payload: four heap-backed strings, one boolean, and one static trust-model string slice.
+    </p>
+
+    <section class="sheet" aria-label="Raw memory layout diagram for RenderedDocument">
+      <div class="top-grid">
+        <article class="panel blue">
+          <div class="panel-head">
+            <span class="panel-title">Stack / struct object</span>
+            <span class="panel-subtitle">conceptual source-order view, 64-bit pointers</span>
+          </div>
+          <div class="struct-layout">
+            <div class="field-row header">
+              <div>offset</div>
+              <div>field</div>
+              <div>word 0</div>
+              <div>word 1</div>
+              <div>word 2</div>
+            </div>
+            <div class="field-row">
+              <div class="slot">0x00</div>
+              <div class="field">title: String</div>
+              <div><span class="ptr">ptr</span> -> heap A</div>
+              <div><code>len = 5</code></div>
+              <div><code>cap >= 5</code></div>
+            </div>
+            <div class="field-row">
+              <div class="slot">0x18</div>
+              <div class="field">html: String</div>
+              <div><span class="ptr">ptr</span> -> heap B</div>
+              <div><code>len = 15</code></div>
+              <div><code>cap >= 15</code></div>
+            </div>
+            <div class="field-row">
+              <div class="slot">0x30</div>
+              <div class="field">source_name: String</div>
+              <div><span class="ptr">ptr</span> -> heap C</div>
+              <div><code>len = 8</code></div>
+              <div><code>cap >= 8</code></div>
+            </div>
+            <div class="field-row">
+              <div class="slot">0x48</div>
+              <div class="field">source_path: String</div>
+              <div><span class="ptr">ptr</span> -> heap D</div>
+              <div><code>len = 16</code></div>
+              <div><code>cap >= 16</code></div>
+            </div>
+            <div class="field-row">
+              <div class="slot">0x60</div>
+              <div class="field">watching: bool</div>
+              <div><code>0x01</code> true</div>
+              <div><code>padding</code></div>
+              <div><code>padding</code></div>
+            </div>
+            <div class="field-row">
+              <div class="slot">0x68</div>
+              <div class="field">trust_model: &amp;'static str</div>
+              <div><span class="ptr">ptr</span> -> .rodata</div>
+              <div><code>len = 30</code></div>
+              <div><code>fat pointer</code></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel green">
+          <div class="panel-head">
+            <span class="panel-title">Heap and static storage islands</span>
+            <span class="panel-subtitle">String buffers own UTF-8 bytes; &amp;str only borrows static bytes</span>
+          </div>
+          <div class="heap">
+            <div class="heap-block">
+              <div class="heap-label"><span>heap A: <code>title</code></span><span><code>"Guide"</code></span></div>
+              <div class="byte-strip">
+                <span class="byte">47</span><span class="byte">75</span><span class="byte">69</span><span class="byte">64</span><span class="byte">65</span><span class="byte pad">..</span><span class="byte pad">..</span><span class="byte pad">..</span>
+                <span class="byte pad">..</span><span class="byte pad">..</span><span class="byte pad">..</span><span class="byte pad">..</span><span class="byte pad">..</span><span class="byte pad">..</span><span class="byte pad">..</span><span class="byte pad">..</span>
+              </div>
+            </div>
+            <div class="heap-block">
+              <div class="heap-label"><span>heap B: <code>html</code></span><span><code>"&lt;h1&gt;Guide&lt;/h1&gt;\n"</code></span></div>
+              <div class="byte-strip">
+                <span class="byte">3C</span><span class="byte">68</span><span class="byte">31</span><span class="byte">3E</span><span class="byte">47</span><span class="byte">75</span><span class="byte">69</span><span class="byte">64</span>
+                <span class="byte">65</span><span class="byte">3C</span><span class="byte">2F</span><span class="byte">68</span><span class="byte">31</span><span class="byte">3E</span><span class="byte">0A</span><span class="byte pad">..</span>
+              </div>
+            </div>
+            <div class="heap-block">
+              <div class="heap-label"><span>heap C: <code>source_name</code></span><span><code>"guide.md"</code></span></div>
+              <div class="byte-strip">
+                <span class="byte">67</span><span class="byte">75</span><span class="byte">69</span><span class="byte">64</span><span class="byte">65</span><span class="byte">2E</span><span class="byte">6D</span><span class="byte">64</span>
+                <span class="byte pad">..</span><span class="byte pad">..</span><span class="byte pad">..</span><span class="byte pad">..</span><span class="byte pad">..</span><span class="byte pad">..</span><span class="byte pad">..</span><span class="byte pad">..</span>
+              </div>
+            </div>
+            <div class="heap-block">
+              <div class="heap-label"><span>heap D: <code>source_path</code></span><span><code>r"C:\docs\guide.md"</code></span></div>
+              <div class="byte-strip">
+                <span class="byte">43</span><span class="byte">3A</span><span class="byte">5C</span><span class="byte">64</span><span class="byte">6F</span><span class="byte">63</span><span class="byte">73</span><span class="byte">5C</span>
+                <span class="byte">67</span><span class="byte">75</span><span class="byte">69</span><span class="byte">64</span><span class="byte">65</span><span class="byte">2E</span><span class="byte">6D</span><span class="byte">64</span>
+              </div>
+            </div>
+            <div class="heap-block">
+              <div class="heap-label"><span>.rodata: <code>trusted_preview::TRUST_MODEL</code></span><span><code>"trusted-local-markdown-preview"</code></span></div>
+              <div class="byte-strip">
+                <span class="byte static">74</span><span class="byte static">72</span><span class="byte static">75</span><span class="byte static">73</span><span class="byte static">74</span><span class="byte static">65</span><span class="byte static">64</span><span class="byte static">2D</span>
+                <span class="byte static">6C</span><span class="byte static">6F</span><span class="byte static">63</span><span class="byte static">61</span><span class="byte static">6C</span><span class="byte static">2D</span><span class="byte static">6D</span><span class="byte static">61</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <aside class="note-stack">
+          <div class="note red">
+            <strong>Rust layout caveat</strong>
+            <span><code>RenderedDocument</code> has the default Rust representation. Field order, padding, and total size are not an ABI contract. This diagram is a source-order mental model for a 64-bit build.</span>
+          </div>
+          <div class="note">
+            <strong>Why the object is mostly pointers</strong>
+            <span>Each <code>String</code> is a three-word handle: pointer, length, capacity. The UTF-8 content lives elsewhere on the heap.</span>
+          </div>
+          <div class="note">
+            <strong>Clone behavior</strong>
+            <span>Cloning <code>RenderedDocument</code> allocates fresh heap buffers for the four <code>String</code> fields, but the <code>&amp;'static str</code> still points at the same static bytes.</span>
+          </div>
+        </aside>
+      </div>
+
+      <div class="arrow-grid" aria-label="Legend and interpretation notes">
+        <div class="mini" data-step="1">
+          <strong>Source value</strong>
+          <span><code>render_markdown</code> constructs this struct after Comrak produces HTML and local links are rewritten.</span>
+        </div>
+        <div class="mini" data-step="2">
+          <strong>Stack words</strong>
+          <span>The visible stack object contains handles and small scalars, not the Markdown or HTML bytes themselves.</span>
+        </div>
+        <div class="mini" data-step="3">
+          <strong>Heap buffers</strong>
+          <span>Owned string buffers are movable allocations. Capacity may exceed length; unused cells are shown as dashed padding.</span>
+        </div>
+        <div class="mini" data-step="4">
+          <strong>Static trust model</strong>
+          <span><code>trust_model</code> is a fat pointer into static read-only storage, used by the frontend trust boundary.</span>
+        </div>
+      </div>
+
+      <p class="source">
+        Sources: <code>src-tauri/src/markdown.rs</code> defines <code>RenderedDocument</code> and construction paths;
+        <code>src-tauri/src/trusted_preview.rs</code> defines <code>TRUST_MODEL</code>.
+        Offsets assume conventional 64-bit Rust <code>String</code> and <code>&amp;str</code> word layouts for explanation, not a stable Rust ABI.
+      </p>
+    </section>
+  </main>
+</body>
+</html>

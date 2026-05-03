@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Technical Diagram Maker Multi-Diagram Showcase</title>
+  <style>
+    :root {
+      --ink: #111827;
+      --muted: #5f6368;
+      --line: #294866;
+      --blue-fill: #dceeff;
+      --blue-stroke: #2f6fa8;
+      --green-fill: #dcf7e7;
+      --green-stroke: #2d9a6b;
+      --red-fill: #fae4e5;
+      --red-stroke: #b23a3f;
+      --orange-fill: #fff0d9;
+      --orange-stroke: #c96b2c;
+      --yellow-fill: #fff5c7;
+      --yellow-stroke: #c98a18;
+      --purple-fill: #efe7ff;
+      --purple-stroke: #7d4bb0;
+      --gray-fill: #f4f4f4;
+      --gray-stroke: #c7c7c7;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #f7fafc;
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      max-width: 1720px;
+      margin: 0 auto;
+      padding: 30px 30px 46px;
+    }
+
+    h1 {
+      margin: 0;
+      text-align: center;
+      font-size: 36px;
+      line-height: 1.28;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 8px auto 24px;
+      max-width: 1060px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 15px;
+      line-height: 1.45;
+    }
+
+    .poster {
+      display: grid;
+      grid-template-columns: 1.06fr 1fr 1fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .panel {
+      min-height: 356px;
+      padding: 18px 18px 16px;
+      background: #fff;
+      border: 1px solid #d7e0e8;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .panel.wide { grid-column: span 2; }
+
+    .panel h2 {
+      margin: 0 0 3px;
+      font-size: 18px;
+      line-height: 1.25;
+    }
+
+    .panel p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .caption {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: #f7fafc;
+      border: 1px solid #d7e0e8;
+      border-radius: 8px;
+      color: #394656;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .label { fill: var(--ink); font-size: 15px; font-weight: 800; }
+    .small { fill: var(--muted); font-size: 11px; }
+    .tiny { fill: var(--muted); font-size: 10px; }
+    .mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    .edge { fill: none; stroke: var(--line); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .seq-line { fill: none; stroke: #15324a; stroke-width: 2.9; stroke-linecap: round; stroke-linejoin: round; }
+    .edge-soft { fill: none; stroke: #6f879c; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 6 6; }
+    .edge-red { fill: none; stroke: var(--red-stroke); stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+    .edge-dot { fill: none; stroke: #7d4bb0; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 2 8; }
+    .axis { stroke: #b7c7d6; stroke-width: 1; }
+    .lane-line { stroke: #c7d2de; stroke-width: 1.1; stroke-dasharray: 5 6; }
+    .code { fill: #1d2733; }
+    .code-text { fill: #d8e2ec; font-size: 10px; }
+    .byte { stroke: #c7d2de; stroke-width: 1; }
+
+    @media (max-width: 980px) {
+      main { padding: 22px 14px 34px; }
+      .poster { grid-template-columns: 1fr; }
+      .panel.wide { grid-column: auto; }
+      h1 { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Technical Diagram Maker Multi-Diagram Showcase</h1>
+  <p class="subtitle">One artifact using several diagram grammars at once: architecture, sequence, state machine with circles, raw memory layout, connector styles, manifest comparison, and capability radar.</p>
+
+  <section class="poster">
+    <article class="panel wide">
+      <h2>1. Architecture Map</h2>
+      <p>Static boundaries and tool ownership for the diagram skill.</p>
+      <svg viewBox="0 0 760 260" role="img" aria-label="Architecture map">
+        <defs>
+          <marker id="arrow-a" viewBox="0 0 12 12" markerWidth="6" markerHeight="6" refX="10" refY="6" orient="auto">
+            <path d="M 1 1 L 10 6 L 1 11 z" fill="#15324a"></path>
+          </marker>
+        </defs>
+        <rect x="20" y="24" width="210" height="188" rx="10" fill="#eef3f4" stroke="#d7e0e8"></rect>
+        <text class="small mono" x="38" y="50">SOURCE INPUTS</text>
+        <rect id="repo-node" x="42" y="72" width="158" height="48" rx="8" fill="#dceeff" stroke="#2f6fa8"></rect>
+        <text class="label" x="62" y="98">Repo files</text>
+        <text class="small" x="62" y="114">code, routes, structs</text>
+        <rect id="prose-node" x="42" y="140" width="158" height="48" rx="8" fill="#efe7ff" stroke="#7d4bb0"></rect>
+        <text class="label" x="62" y="166">Text brief</text>
+        <text class="small" x="62" y="182">entities and claims</text>
+
+        <rect x="284" y="24" width="220" height="188" rx="10" fill="#eef3f4" stroke="#d7e0e8"></rect>
+        <text class="small mono" x="302" y="50">SKILL CORE</text>
+        <rect id="style-node" x="306" y="70" width="158" height="38" rx="8" fill="#fff0d9" stroke="#c96b2c"></rect>
+        <text class="label" x="330" y="94">Style guide</text>
+        <rect id="render-node" x="306" y="122" width="158" height="38" rx="8" fill="#dcf7e7" stroke="#2d9a6b"></rect>
+        <text class="label" x="324" y="146">Renderer</text>
+        <rect id="qa-node" x="306" y="174" width="158" height="38" rx="8" fill="#fff5c7" stroke="#c98a18"></rect>
+        <text class="label" x="326" y="198">QA tools</text>
+
+        <rect x="558" y="24" width="174" height="188" rx="10" fill="#eef3f4" stroke="#d7e0e8"></rect>
+        <text class="small mono" x="576" y="50">ARTIFACTS</text>
+        <rect id="html-node" x="580" y="72" width="122" height="48" rx="8" fill="#ffffff" stroke="#9bb2c5"></rect>
+        <text class="label" x="610" y="98">HTML</text>
+        <text class="small" x="610" y="114">inline SVG</text>
+        <rect id="manifest-node" x="580" y="140" width="122" height="48" rx="8" fill="#f4f4f4" stroke="#c7c7c7"></rect>
+        <text class="label" x="604" y="166">Manifest</text>
+        <text class="small" x="604" y="182">evidence</text>
+
+        <path class="edge" data-qa-connector data-qa-source="#repo-node" data-qa-target="#style-node" d="M 200 96 L 306 89" marker-end="url(#arrow-a)"></path>
+        <path class="edge" data-qa-connector data-qa-source="#prose-node" data-qa-target="#render-node" d="M 200 164 L 306 141" marker-end="url(#arrow-a)"></path>
+        <path class="edge" data-qa-connector data-qa-source="#render-node" data-qa-target="#html-node" d="M 464 141 L 580 96" marker-end="url(#arrow-a)"></path>
+        <path class="edge" data-qa-connector data-qa-source="#qa-node" data-qa-target="#manifest-node" d="M 464 193 L 580 164" marker-end="url(#arrow-a)"></path>
+      </svg>
+    </article>
+
+    <article class="panel">
+      <h2>2. Sequence Diagram</h2>
+      <p>Interaction path for a full verification run.</p>
+      <svg viewBox="0 0 470 300" role="img" aria-label="Sequence diagram">
+        <defs>
+          <marker id="arrow-s" viewBox="0 0 12 12" markerWidth="6" markerHeight="6" refX="10" refY="6" orient="auto">
+            <path d="M 1 1 L 10 6 L 1 11 z" fill="#294866"></path>
+          </marker>
+          <marker id="arrow-s-red" viewBox="0 0 12 12" markerWidth="6" markerHeight="6" refX="10" refY="6" orient="auto">
+            <path d="M 1 1 L 10 6 L 1 11 z" fill="#b23a3f"></path>
+          </marker>
+        </defs>
+        <text class="small mono" x="38" y="34">Codex</text>
+        <text class="small mono" x="158" y="34">Renderer</text>
+        <text class="small mono" x="276" y="34">Browser QA</text>
+        <text class="small mono" x="386" y="34">Manifest</text>
+        <line class="lane-line" x1="58" y1="48" x2="58" y2="270"></line>
+        <line class="lane-line" x1="178" y1="48" x2="178" y2="270"></line>
+        <line class="lane-line" x1="304" y1="48" x2="304" y2="270"></line>
+        <line class="lane-line" x1="414" y1="48" x2="414" y2="270"></line>
+        <rect x="42" y="68" width="32" height="156" rx="5" fill="#dceeff" stroke="#2f6fa8"></rect>
+        <rect x="166" y="88" width="24" height="66" rx="5" fill="#dcf7e7" stroke="#2d9a6b"></rect>
+        <rect x="292" y="156" width="24" height="54" rx="5" fill="#fff5c7" stroke="#c98a18"></rect>
+        <path class="seq-line" data-qa-connector d="M 74 92 L 166 92" marker-end="url(#arrow-s)"></path>
+        <text class="tiny" x="91" y="83">render examples</text>
+        <path class="seq-line" data-qa-connector d="M 190 136 L 292 166" marker-end="url(#arrow-s)"></path>
+        <text class="tiny" x="210" y="124">screenshot + inspect</text>
+        <path class="seq-line" data-qa-connector d="M 316 192 L 414 192" marker-end="url(#arrow-s)"></path>
+        <text class="tiny" x="332" y="183">issue counts</text>
+        <rect x="86" y="224" width="294" height="42" rx="8" fill="#fae4e5" stroke="#b23a3f" stroke-dasharray="6 5"></rect>
+        <text class="small mono" x="104" y="248">alt: any gate fails -> fix diagram -> rerun</text>
+        <path class="edge-red" data-qa-connector d="M 292 210 C 236 238, 116 238, 74 210" marker-end="url(#arrow-s-red)"></path>
+      </svg>
+    </article>
+
+    <article class="panel">
+      <h2>3. State Machine</h2>
+      <p>Lifecycle of a generated diagram artifact.</p>
+      <svg viewBox="0 0 470 300" role="img" aria-label="State machine">
+        <defs>
+          <marker id="arrow-st" viewBox="0 0 12 12" markerWidth="6" markerHeight="6" refX="10" refY="6" orient="auto">
+            <path d="M 1 1 L 10 6 L 1 11 z" fill="#294866"></path>
+          </marker>
+          <marker id="arrow-st-red" viewBox="0 0 12 12" markerWidth="6" markerHeight="6" refX="10" refY="6" orient="auto">
+            <path d="M 1 1 L 10 6 L 1 11 z" fill="#b23a3f"></path>
+          </marker>
+        </defs>
+        <circle id="start-state" cx="44" cy="148" r="16" fill="#111827"></circle>
+        <text class="tiny mono" x="42" y="184">start</text>
+        <rect id="draft-state" x="78" y="112" width="112" height="72" rx="10" fill="#dceeff" stroke="#2f6fa8"></rect>
+        <text class="label" x="112" y="142">Draft</text>
+        <text class="small" x="100" y="162">facts placed</text>
+        <circle id="qa-state" cx="292" cy="100" r="45" fill="#fff5c7" stroke="#c98a18" stroke-width="1.3"></circle>
+        <text class="label" x="279" y="96">QA</text>
+        <text class="small" x="267" y="116">measured</text>
+        <rect id="fix-state" x="236" y="174" width="112" height="72" rx="10" fill="#fae4e5" stroke="#b23a3f"></rect>
+        <text class="label" x="270" y="204">Fix</text>
+        <text class="small" x="258" y="224">reroute/wrap</text>
+        <circle id="done-state" cx="414" cy="148" r="38" fill="#dcf7e7" stroke="#2d9a6b" stroke-width="1.3"></circle>
+        <text class="label" x="397" y="145">Ship</text>
+        <text class="small" x="396" y="164">clean</text>
+        <path class="edge" data-qa-connector data-qa-source="#start-state" data-qa-target="#draft-state" d="M 60 148 L 78 148" marker-end="url(#arrow-st)"></path>
+        <path class="edge" data-qa-connector data-qa-source="#draft-state" data-qa-target="#qa-state" d="M 190 130 L 249 113" marker-end="url(#arrow-st)"></path>
+        <text class="tiny" x="187" y="107">render</text>
+        <path class="edge-red" data-qa-connector data-qa-source="#qa-state" data-qa-target="#fix-state" d="M 292 145 L 292 174" marker-end="url(#arrow-st-red)"></path>
+        <text class="tiny" x="305" y="158">issues</text>
+        <path class="edge" data-qa-connector data-qa-source="#fix-state" data-qa-target="#draft-state" d="M 236 210 C 174 244, 120 226, 118 184" marker-end="url(#arrow-st)"></path>
+        <text class="tiny" x="118" y="238">edit</text>
+        <path class="edge" data-qa-connector data-qa-source="#qa-state" data-qa-target="#done-state" d="M 334 117 L 379 134" marker-end="url(#arrow-st)"></path>
+        <text class="tiny" x="351" y="92">ok</text>
+        <path class="edge" data-qa-connector data-qa-source="#draft-state" data-qa-target="#draft-state" d="M 100 112 C 84 74, 156 74, 142 112" marker-end="url(#arrow-st)"></path>
+        <text class="tiny" x="86" y="72">clarify source</text>
+      </svg>
+    </article>
+
+    <article class="panel">
+      <h2>4. Raw Memory Layout</h2>
+      <p>Conceptual variable layout for a manifest entry.</p>
+      <svg viewBox="0 0 470 300" role="img" aria-label="Raw memory layout">
+        <text class="small mono" x="24" y="32">inline Entry object</text>
+        <rect x="24" y="48" width="420" height="44" rx="8" fill="#f4f4f4" stroke="#c7c7c7"></rect>
+        <rect class="byte" x="38" y="60" width="62" height="20" fill="#dceeff"></rect>
+        <rect class="byte" x="100" y="60" width="62" height="20" fill="#dceeff"></rect>
+        <rect class="byte" x="162" y="60" width="62" height="20" fill="#fff0d9"></rect>
+        <rect class="byte" x="224" y="60" width="62" height="20" fill="#dcf7e7"></rect>
+        <rect class="byte" x="286" y="60" width="62" height="20" fill="#fff5c7"></rect>
+        <rect class="byte" x="348" y="60" width="62" height="20" fill="#efe7ff"></rect>
+        <text class="tiny mono" x="48" y="75">name*</text>
+        <text class="tiny mono" x="110" y="75">html*</text>
+        <text class="tiny mono" x="170" y="75">qaOk</text>
+        <text class="tiny mono" x="232" y="75">counts</text>
+        <text class="tiny mono" x="294" y="75">diff*</text>
+        <text class="tiny mono" x="356" y="75">size</text>
+        <text class="small mono" x="24" y="126">pointed-to storage</text>
+        <rect x="24" y="146" width="194" height="118" rx="8" fill="#dceeff" stroke="#2f6fa8"></rect>
+        <text class="small mono" x="44" y="174">name bytes</text>
+        <text class="tiny mono" x="44" y="198">"sequence-alt"</text>
+        <text class="tiny mono" x="44" y="222">len 12</text>
+        <rect x="250" y="146" width="194" height="118" rx="8" fill="#fff5c7" stroke="#c98a18"></rect>
+        <text class="small mono" x="270" y="174">diff stats</text>
+        <text class="tiny mono" x="270" y="198">ratio: 0.000</text>
+        <text class="tiny mono" x="270" y="222">changedPixels: 0</text>
+        <path class="edge" data-qa-connector d="M 69 92 L 88 146" marker-end="url(#arrow-st)"></path>
+        <path class="edge" data-qa-connector d="M 318 92 L 338 146" marker-end="url(#arrow-st)"></path>
+      </svg>
+    </article>
+
+    <article class="panel">
+      <h2>5. Connector Styles</h2>
+      <p>Different edge grammars for different technical relationships.</p>
+      <svg viewBox="0 0 470 300" role="img" aria-label="Connector styles">
+        <defs>
+          <marker id="arrow-conn" viewBox="0 0 12 12" markerWidth="6" markerHeight="6" refX="10" refY="6" orient="auto">
+            <path d="M 1 1 L 10 6 L 1 11 z" fill="#294866"></path>
+          </marker>
+          <marker id="arrow-conn-red" viewBox="0 0 12 12" markerWidth="6" markerHeight="6" refX="10" refY="6" orient="auto">
+            <path d="M 1 1 L 10 6 L 1 11 z" fill="#b23a3f"></path>
+          </marker>
+          <marker id="dot-conn" markerWidth="6" markerHeight="6" refX="4" refY="4">
+            <circle cx="4" cy="4" r="3" fill="#7d4bb0"></circle>
+          </marker>
+          <marker id="arrow-conn-start" viewBox="0 0 12 12" markerWidth="6" markerHeight="6" refX="2" refY="6" orient="auto">
+            <path d="M 10 1 L 2 6 L 10 11 z" fill="#294866"></path>
+          </marker>
+        </defs>
+        <rect id="conn-a" x="32" y="42" width="82" height="34" rx="8" fill="#dceeff" stroke="#2f6fa8"></rect>
+        <text class="tiny mono" x="54" y="63">direct</text>
+        <rect id="conn-b" x="172" y="42" width="82" height="34" rx="8" fill="#dcf7e7" stroke="#2d9a6b"></rect>
+        <text class="tiny mono" x="196" y="63">target</text>
+        <path class="edge" data-qa-connector data-qa-source="#conn-a" data-qa-target="#conn-b" d="M 114 59 L 172 59" marker-end="url(#arrow-conn)"></path>
+
+        <rect id="conn-c" x="32" y="106" width="82" height="34" rx="8" fill="#fff0d9" stroke="#c96b2c"></rect>
+        <text class="tiny mono" x="54" y="127">route</text>
+        <rect id="conn-d" x="172" y="156" width="82" height="34" rx="8" fill="#efe7ff" stroke="#7d4bb0"></rect>
+        <text class="tiny mono" x="190" y="177">store</text>
+        <path class="edge" data-qa-connector data-qa-source="#conn-c" data-qa-target="#conn-d" d="M 114 123 L 142 123 L 142 173 L 172 173" marker-end="url(#arrow-conn)"></path>
+        <text class="tiny" x="132" y="108">orthogonal</text>
+
+        <rect id="conn-e" x="314" y="42" width="92" height="34" rx="8" fill="#fff5c7" stroke="#c98a18"></rect>
+        <text class="tiny mono" x="340" y="63">return</text>
+        <path class="edge-soft" data-qa-connector data-qa-target="#conn-e" d="M 404 166 C 430 142 430 106 406 76" marker-end="url(#arrow-conn)"></path>
+        <text class="tiny" x="322" y="108">dashed callback</text>
+
+        <rect id="conn-f" x="314" y="156" width="92" height="34" rx="8" fill="#fae4e5" stroke="#b23a3f"></rect>
+        <text class="tiny mono" x="338" y="177">failure</text>
+        <path class="edge-red" data-qa-connector data-qa-source="#conn-f" d="M 314 173 C 278 212 224 230 166 222" marker-end="url(#arrow-conn-red)"></path>
+        <text class="tiny" x="230" y="247">curved failure</text>
+
+        <rect id="conn-g" x="42" y="222" width="92" height="34" rx="8" fill="#f4f4f4" stroke="#c7c7c7"></rect>
+        <text class="tiny mono" x="64" y="243">observe</text>
+        <path class="edge-dot" data-qa-connector data-qa-source="#conn-g" d="M 134 239 L 232 239" marker-start="url(#dot-conn)" marker-end="url(#arrow-conn)"></path>
+        <text class="tiny" x="140" y="270">event stream</text>
+
+        <rect id="conn-h" x="296" y="222" width="92" height="34" rx="8" fill="#dceeff" stroke="#2f6fa8"></rect>
+        <text class="tiny mono" x="315" y="243">sync</text>
+        <path class="edge" data-qa-connector data-qa-source="#conn-h" data-qa-target="#conn-h" d="M 330 222 C 302 194 386 194 360 222" marker-start="url(#arrow-conn-start)" marker-end="url(#arrow-conn)"></path>
+        <text class="tiny" x="300" y="282">bidirectional loop</text>
+      </svg>
+    </article>
+
+    <article class="panel wide">
+      <h2>6. Manifest Comparison Matrix</h2>
+      <p>Diffable evidence model, not just pixels.</p>
+      <svg viewBox="0 0 760 300" role="img" aria-label="Manifest comparison matrix">
+        <rect x="24" y="42" width="712" height="214" rx="10" fill="#ffffff" stroke="#9bb2c5"></rect>
+        <rect x="24" y="42" width="712" height="34" rx="10" fill="#eef3f4" stroke="#9bb2c5"></rect>
+        <text class="small mono" x="48" y="64">artifact</text>
+        <text class="small mono" x="190" y="64">qa</text>
+        <text class="small mono" x="286" y="64">dimensions</text>
+        <text class="small mono" x="420" y="64">issue counts</text>
+        <text class="small mono" x="590" y="64">visual diff</text>
+        <line class="axis" x1="24" y1="112" x2="736" y2="112"></line>
+        <line class="axis" x1="24" y1="148" x2="736" y2="148"></line>
+        <line class="axis" x1="24" y1="184" x2="736" y2="184"></line>
+        <line class="axis" x1="24" y1="220" x2="736" y2="220"></line>
+        <text class="tiny mono" x="48" y="99">flow-dense</text>
+        <text class="tiny mono" x="190" y="99">true</text>
+        <text class="tiny mono" x="286" y="99">1700x1200</text>
+        <text class="tiny mono" x="420" y="99">0 / 0 / 0 / 0</text>
+        <text class="tiny mono" x="590" y="99">0.000%</text>
+        <text class="tiny mono" x="48" y="135">sequence-alt</text>
+        <text class="tiny mono" x="190" y="135">true</text>
+        <text class="tiny mono" x="286" y="135">1700x1200</text>
+        <text class="tiny mono" x="420" y="135">0 / 0 / 0 / 0</text>
+        <text class="tiny mono" x="590" y="135">0.000%</text>
+        <text class="tiny mono" x="48" y="171">state-dense</text>
+        <text class="tiny mono" x="190" y="171">false</text>
+        <text class="tiny mono" x="286" y="171">1728x1200</text>
+        <text class="tiny mono" x="420" y="171">0 / 2 / 1 / 0</text>
+        <text class="tiny mono" x="590" y="171">1.340%</text>
+        <rect x="180" y="156" width="42" height="20" rx="5" fill="#fae4e5" stroke="#b23a3f"></rect>
+        <rect x="584" y="156" width="58" height="20" rx="5" fill="#fae4e5" stroke="#b23a3f"></rect>
+        <text class="tiny mono" x="48" y="207">raw-memory</text>
+        <text class="tiny mono" x="190" y="207">true</text>
+        <text class="tiny mono" x="286" y="207">1700x1200</text>
+        <text class="tiny mono" x="420" y="207">0 / 0 / 0 / 0</text>
+        <text class="tiny mono" x="590" y="207">0.000%</text>
+        <path class="edge-red" data-qa-connector d="M 624 176 C 654 214, 674 234, 706 240" marker-end="url(#arrow-st-red)"></path>
+        <text class="tiny" x="470" y="244">evidence drift blocks the gate</text>
+      </svg>
+    </article>
+
+    <article class="panel">
+      <h2>7. Coverage Radar</h2>
+      <p>Shows breadth without turning the whole poster into a flow.</p>
+      <svg viewBox="0 0 470 300" role="img" aria-label="Coverage radar">
+        <g transform="translate(235 150)">
+          <polygon points="0,-100 86.6,-50 86.6,50 0,100 -86.6,50 -86.6,-50" fill="#f7fafc" stroke="#c7d2de"></polygon>
+          <polygon points="0,-68 58.9,-34 58.9,34 0,68 -58.9,34 -58.9,-34" fill="none" stroke="#d7e0e8"></polygon>
+          <polygon points="0,-34 29.4,-17 29.4,17 0,34 -29.4,17 -29.4,-17" fill="none" stroke="#d7e0e8"></polygon>
+          <line class="axis" x1="0" y1="0" x2="0" y2="-110"></line>
+          <line class="axis" x1="0" y1="0" x2="95" y2="-55"></line>
+          <line class="axis" x1="0" y1="0" x2="95" y2="55"></line>
+          <line class="axis" x1="0" y1="0" x2="0" y2="110"></line>
+          <line class="axis" x1="0" y1="0" x2="-95" y2="55"></line>
+          <line class="axis" x1="0" y1="0" x2="-95" y2="-55"></line>
+          <polygon points="0,-95 74,-43 82,47 0,90 -70,40 -78,-45" fill="#dceeff" fill-opacity=".72" stroke="#2f6fa8" stroke-width="2"></polygon>
+        </g>
+        <text class="tiny mono" x="214" y="28">flow</text>
+        <text class="tiny mono" x="328" y="94">sequence</text>
+        <text class="tiny mono" x="328" y="212">state</text>
+        <text class="tiny mono" x="206" y="282">memory</text>
+        <text class="tiny mono" x="72" y="212">diff</text>
+        <text class="tiny mono" x="70" y="94">QA</text>
+        <rect x="22" y="22" width="108" height="48" rx="8" fill="#dcf7e7" stroke="#2d9a6b"></rect>
+        <text class="small mono" x="40" y="50">13+ types</text>
+      </svg>
+    </article>
+  </section>
+</main>
+</body>
+</html>

@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>mdv Flow Diagrams</title>
+<style>
+  :root {
+    --ink: #111827;
+    --muted: #5f6368;
+    --line: #294866;
+    --canvas: #ffffff;
+    --band: #eef3f4;
+    --blue-fill: #dceeff;
+    --blue-stroke: #2f6fa8;
+    --green-fill: #dcf7e7;
+    --green-stroke: #2d9a6b;
+    --orange-fill: #fff0d9;
+    --orange-stroke: #c96b2c;
+    --yellow-fill: #fff5c7;
+    --yellow-stroke: #c98a18;
+    --purple-fill: #efe7ff;
+    --purple-stroke: #7d4bb0;
+    --gray-fill: #f4f4f4;
+    --gray-stroke: #c7c7c7;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  main {
+    width: min(1680px, calc(100vw - 56px));
+    margin: 0 auto;
+    padding: 44px 0 54px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 44px;
+    line-height: 1.1;
+    text-align: center;
+  }
+
+  .subtitle {
+    margin: 12px auto 36px;
+    max-width: 1120px;
+    color: var(--muted);
+    font-size: 20px;
+    line-height: 1.35;
+    text-align: center;
+  }
+
+  .flow-card {
+    margin: 28px 0;
+    padding: 24px 28px 28px;
+    border-radius: 18px;
+    background: var(--band);
+  }
+
+  .flow-title {
+    margin: 0 0 6px;
+    font-size: 21px;
+    line-height: 1.2;
+  }
+
+  .flow-caption {
+    margin: 0 0 20px;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.35;
+  }
+
+  .flow {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(168px, 1fr) 46px;
+    align-items: center;
+    gap: 0;
+  }
+
+  .flow.five {
+    grid-template-columns: minmax(170px, 1fr) 46px minmax(170px, 1fr) 46px minmax(170px, 1fr) 46px minmax(170px, 1fr) 46px minmax(170px, 1fr);
+  }
+
+  .flow.six {
+    grid-template-columns: minmax(156px, 1fr) 42px minmax(156px, 1fr) 42px minmax(156px, 1fr) 42px minmax(156px, 1fr) 42px minmax(156px, 1fr) 42px minmax(156px, 1fr);
+  }
+
+  .node {
+    min-height: 104px;
+    padding: 15px 14px;
+    border: 2px solid var(--blue-stroke);
+    border-radius: 10px;
+    background: var(--blue-fill);
+    text-align: center;
+  }
+
+  .node.green {
+    border-color: var(--green-stroke);
+    background: var(--green-fill);
+  }
+
+  .node.orange {
+    border-color: var(--orange-stroke);
+    background: var(--orange-fill);
+  }
+
+  .node.yellow {
+    border-color: var(--yellow-stroke);
+    background: var(--yellow-fill);
+  }
+
+  .node.purple {
+    border-color: var(--purple-stroke);
+    background: var(--purple-fill);
+  }
+
+  .node.gray {
+    border-color: var(--gray-stroke);
+    background: var(--gray-fill);
+  }
+
+  .label {
+    display: block;
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1.16;
+  }
+
+  .note {
+    display: block;
+    margin-top: 7px;
+    color: var(--muted);
+    font-size: 13.5px;
+    line-height: 1.22;
+  }
+
+  .mono {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+
+  .arrow {
+    width: 46px;
+    height: 24px;
+    overflow: visible;
+  }
+
+  .arrow path {
+    stroke: var(--line);
+    stroke-width: 3;
+    fill: none;
+  }
+
+  .arrow marker path {
+    fill: var(--line);
+  }
+
+  .legend {
+    margin-top: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 18px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .swatch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .swatch::before {
+    content: "";
+    width: 15px;
+    height: 15px;
+    border: 2px solid var(--blue-stroke);
+    border-radius: 4px;
+    background: var(--blue-fill);
+  }
+
+  .swatch.green::before {
+    border-color: var(--green-stroke);
+    background: var(--green-fill);
+  }
+
+  .swatch.orange::before {
+    border-color: var(--orange-stroke);
+    background: var(--orange-fill);
+  }
+
+  .swatch.yellow::before {
+    border-color: var(--yellow-stroke);
+    background: var(--yellow-fill);
+  }
+
+  .swatch.purple::before {
+    border-color: var(--purple-stroke);
+    background: var(--purple-fill);
+  }
+
+  @media (max-width: 980px) {
+    main {
+      width: min(760px, calc(100vw - 28px));
+      padding-top: 28px;
+    }
+
+    h1 {
+      font-size: 34px;
+    }
+
+    .flow,
+    .flow.five,
+    .flow.six {
+      display: block;
+    }
+
+    .node {
+      min-height: auto;
+      margin: 0 0 12px;
+    }
+
+    .arrow {
+      display: block;
+      transform: rotate(90deg);
+      margin: 0 auto 12px;
+    }
+  }
+</style>
+<main>
+  <h1>mdv Runtime Flow Diagrams</h1>
+  <p class="subtitle">Five source-derived flows for the Tauri Markdown viewer: startup, open/render, live edits, filesystem refresh, and Mermaid export.</p>
+
+  <section class="flow-card">
+    <h2 class="flow-title">1. App Startup Flow</h2>
+    <p class="flow-caption">The Rust shell creates the hidden main window, restores persisted state, installs the app menu, then lets the WebView request its first workspace payload.</p>
+    <div class="flow five">
+      <div class="node orange"><span class="label">Tauri builder</span><span class="note mono">lib.rs</span><span class="note">plugins, setup, invoke handlers</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#a1)"/></svg>
+      <div class="node yellow"><span class="label">Load state</span><span class="note mono">state.rs</span><span class="note">recent files + window geometry</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#a2)"/></svg>
+      <div class="node green"><span class="label">Show window</span><span class="note mono">setup()</span><span class="note">restore window, install menu</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#a3)"/></svg>
+      <div class="node"><span class="label">Initial invoke</span><span class="note mono">current_workspace</span><span class="note">frontend asks for payload</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#a4)"/></svg>
+      <div class="node purple"><span class="label">Render UI</span><span class="note mono">renderWorkspace()</span><span class="note">tabs, editor, preview, menu</span></div>
+    </div>
+  </section>
+
+  <section class="flow-card">
+    <h2 class="flow-title">2. Open Markdown Or Folder Flow</h2>
+    <p class="flow-caption">Open, drop, recent-file, and explorer-file actions all converge on workspace commands that render Markdown and return a WorkspacePayload.</p>
+    <div class="flow six">
+      <div class="node"><span class="label">User selects path</span><span class="note mono">main.ts</span><span class="note">dialog, drop, recent, explorer</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="b1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#b1)"/></svg>
+      <div class="node orange"><span class="label">Invoke command</span><span class="note mono">commands.rs</span><span class="note">open_markdown / open_folder</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="b2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#b2)"/></svg>
+      <div class="node green"><span class="label">Open path</span><span class="note mono">workspace.rs</span><span class="note">canonicalize, add/replace tab</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="b3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#b3)"/></svg>
+      <div class="node"><span class="label">Render content</span><span class="note mono">markdown.rs</span><span class="note">HTML, Mermaid blocks, local refs</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="b4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#b4)"/></svg>
+      <div class="node yellow"><span class="label">Build payload</span><span class="note mono">WorkspacePayload</span><span class="note">document, tabs, explorer, recent</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="b5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#b5)"/></svg>
+      <div class="node purple"><span class="label">Update WebView</span><span class="note mono">renderWorkspace()</span><span class="note">hydrate preview and Mermaid</span></div>
+    </div>
+  </section>
+
+  <section class="flow-card">
+    <h2 class="flow-title">3. Untitled Edit And Save Flow</h2>
+    <p class="flow-caption">Editor changes are debounced before crossing into Rust. Saving an untitled document writes a Markdown file, then reopens it through the same normal open path.</p>
+    <div class="flow six">
+      <div class="node"><span class="label">Editor input</span><span class="note mono">textarea input</span><span class="note">active untitled document</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="c1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#c1)"/></svg>
+      <div class="node green"><span class="label">Debounce update</span><span class="note mono">queueEditorUpdate()</span><span class="note">150 ms editor flush chain</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="c2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#c2)"/></svg>
+      <div class="node orange"><span class="label">Store content</span><span class="note mono">update_document_content</span><span class="note">workspace_session.rs</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="c3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#c3)"/></svg>
+      <div class="node"><span class="label">Preview draft</span><span class="note mono">untitled_document()</span><span class="note">trusted preview HTML</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="c4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#c4)"/></svg>
+      <div class="node yellow"><span class="label">Save path</span><span class="note mono">save_active_document_to_path</span><span class="note">writes .md</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="c5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#c5)"/></svg>
+      <div class="node purple"><span class="label">Reopen saved file</span><span class="note mono">open_markdown_with_directory</span><span class="note">normal file-backed tab</span></div>
+    </div>
+  </section>
+
+  <section class="flow-card">
+    <h2 class="flow-title">4. Filesystem Watcher Refresh Flow</h2>
+    <p class="flow-caption">File and folder watchers coalesce filesystem events, invalidate cached data, and emit the same WorkspacePayload shape used by direct commands.</p>
+    <div class="flow five">
+      <div class="node gray"><span class="label">File changes</span><span class="note mono">notify event</span><span class="note">document or workspace folder</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="d1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#d1)"/></svg>
+      <div class="node purple"><span class="label">Coalesce refresh</span><span class="note mono">watcher.rs</span><span class="note">100 ms refresh window</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="d2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#d2)"/></svg>
+      <div class="node yellow"><span class="label">Invalidate cache</span><span class="note mono">AppState</span><span class="note">rendered doc or explorer root</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="d3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#d3)"/></svg>
+      <div class="node green"><span class="label">Emit workspace</span><span class="note mono">workspace://updated</span><span class="note">current_workspace()</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="d4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#d4)"/></svg>
+      <div class="node"><span class="label">WebView listener</span><span class="note mono">listen()</span><span class="note">renderWorkspace(event.payload)</span></div>
+    </div>
+  </section>
+
+  <section class="flow-card">
+    <h2 class="flow-title">5. Mermaid Copy And PowerPoint Export Flow</h2>
+    <p class="flow-caption">The preview context menu either copies a Mermaid SVG as PNG in the browser or sends a validated SVG payload to Rust for PowerPoint clipboard automation.</p>
+    <div class="flow six">
+      <div class="node purple"><span class="label">Mermaid SVG</span><span class="note mono">preview context menu</span><span class="note">selected rendered diagram</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="e1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#e1)"/></svg>
+      <div class="node"><span class="label">Serialize SVG</span><span class="note mono">main.ts</span><span class="note">size, viewBox, label cleanup</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="e2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#e2)"/></svg>
+      <div class="node green"><span class="label">Browser copy</span><span class="note mono">canvas + ClipboardItem</span><span class="note">PNG clipboard path</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="e3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#e3)"/></svg>
+      <div class="node orange"><span class="label">PowerPoint command</span><span class="note mono">copy_mermaid_...</span><span class="note">Rust validation path</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="e4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#e4)"/></svg>
+      <div class="node yellow"><span class="label">Temp SVG + script</span><span class="note mono">powerpoint_clipboard.rs</span><span class="note">write files, compute bounds</span></div>
+      <svg class="arrow" viewBox="0 0 46 24" aria-hidden="true"><defs><marker id="e5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 10 5 0 10z"/></marker></defs><path d="M2 12H42" marker-end="url(#e5)"/></svg>
+      <div class="node gray"><span class="label">PowerPoint clipboard</span><span class="note mono">powershell.exe</span><span class="note">convert SVG to slide objects</span></div>
+    </div>
+  </section>
+
+  <div class="legend">
+    <span class="swatch">frontend/UI</span>
+    <span class="swatch green">runtime/session</span>
+    <span class="swatch orange">command boundary/tooling</span>
+    <span class="swatch yellow">payload/cache</span>
+    <span class="swatch purple">preview/watch/export</span>
+  </div>
+</main>
+</html>
