@@ -246,7 +246,7 @@ fn document_has_unsaved_content(document: &OpenDocumentSession) -> bool {
 fn document_label(document: &OpenDocumentSession) -> String {
     if let Some(path) = document.path.as_ref() {
         return path
-            .file_stem()
+            .file_name()
             .and_then(|value| value.to_str())
             .unwrap_or("Untitled")
             .to_owned();
@@ -399,7 +399,7 @@ mod tests {
     }
 
     #[test]
-    fn labels_file_backed_documents_from_their_stem() {
+    fn labels_file_backed_documents_from_their_filename() {
         let document = OpenDocumentSession {
             path: Some(PathBuf::from(r"C:\docs\plan.md")),
             directory: None,
@@ -407,7 +407,7 @@ mod tests {
             content: String::new(),
         };
 
-        assert_eq!(document_label(&document), "plan");
+        assert_eq!(document_label(&document), "plan.md");
     }
 
     #[test]
